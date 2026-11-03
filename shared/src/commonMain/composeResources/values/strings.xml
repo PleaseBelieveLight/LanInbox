@@ -5,4 +5,21 @@
     <string name="send_draft">Text, link, or code</string>
     <string name="send_unavailable">Sending is unavailable in this build.</string>
     <string name="inbox_empty">No messages yet.</string>
+    <string name="development_warning">Development only. Traffic is unencrypted. Use a trusted LAN.</string>
+    <string name="receiver_address">Windows LAN IPv4 address (optional port)</string>
+    <string name="kind_text">Text</string>
+    <string name="kind_link">Link</string>
+    <string name="kind_code">Code</string>
+    <string name="sending">Sending…</string>
+    <string name="delivered">Delivered.</string>
+    <string name="delivery_timeout">Delivery timed out. Retry without editing to avoid duplicates.</string>
+    <string name="delivery_unreachable">Could not reach the Windows receiver.</string>
+    <string name="delivery_rejected">The address, message, or receiver request was rejected. Use a private IPv4 address and up to 64 KiB of text.</string>
+    <string name="delivery_invalid_response">The receiver returned an invalid acknowledgment.</string>
+    <string name="delivery_permission">Allow local network access, then tap Send again.</string>
+    <string name="receiver_starting">Starting development receiver…</string>
+    <string name="receiver_listening">Development receiver listening on port 8765. Traffic is unencrypted.</string>
+    <string name="receiver_failed">Could not start the receiver. Check the listening port and inbox storage.</string>
+    <string name="receiver_disabled">Development receiver is disabled.</string>
+    <string name="copy_message">Copy</string>
 </resources>

@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.luofelix.laninbox.feature.inbox.InboxScreen
+import com.luofelix.laninbox.feature.inbox.InboxMessage
+import com.luofelix.laninbox.feature.inbox.ReceiverStatus
+import com.luofelix.laninbox.feature.send.MessageSender
 import com.luofelix.laninbox.feature.send.SendScreen
 import laninbox.shared.generated.resources.Res
 import laninbox.shared.generated.resources.app_name
@@ -27,8 +30,15 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun App() {
-    val model = viewModel { AppViewModel() }
+fun App(
+    sender: MessageSender? = null,
+    senderId: String = "",
+    initialDraft: String = "",
+    messages: List<InboxMessage> = emptyList(),
+    receiverStatus: ReceiverStatus = ReceiverStatus.Disabled,
+    inboxOnly: Boolean = false,
+) {
+    val model = viewModel { AppViewModel(initialDraft) }
     val state by model.uiState.collectAsStateWithLifecycle()
 
     LanInboxTheme {
@@ -39,7 +49,7 @@ fun App() {
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(16.dp),
                 )
-                PrimaryTabRow(selectedTabIndex = state.destination.ordinal) {
+                if (!inboxOnly) PrimaryTabRow(selectedTabIndex = state.destination.ordinal) {
                     AppDestination.entries.forEach { destination ->
                         Tab(
                             selected = state.destination == destination,
@@ -48,13 +58,20 @@ fun App() {
                         )
                     }
                 }
-                Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    when (state.destination) {
-                        AppDestination.Send -> SendScreen(state.draft, model::editDraft)
-                        AppDestination.Inbox -> InboxScreen()
+                if (inboxOnly || state.destination == AppDestination.Inbox) {
+                    InboxScreen(messages, receiverStatus)
+                } else {
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        SendScreen(
+                            state = state,
+                            onDraftChange = model::editDraft,
+                            onAddressChange = model::editAddress,
+                            onKindChange = model::selectKind,
+                            onSend = sender?.let { { model.send(senderId, it) } },
+                        )
                     }
                 }
             }

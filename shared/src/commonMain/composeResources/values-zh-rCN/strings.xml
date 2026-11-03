@@ -5,4 +5,21 @@
     <string name="send_draft">文字、链接或代码</string>
     <string name="send_unavailable">当前版本暂未开放发送功能。</string>
     <string name="inbox_empty">暂无消息。</string>
+    <string name="development_warning">仅用于开发联调。传输未加密，请使用可信的局域网。</string>
+    <string name="receiver_address">Windows 局域网 IPv4 地址（可加端口）</string>
+    <string name="kind_text">文字</string>
+    <string name="kind_link">链接</string>
+    <string name="kind_code">代码</string>
+    <string name="sending">正在发送…</string>
+    <string name="delivered">已送达。</string>
+    <string name="delivery_timeout">等待确认超时。请直接重试，以免产生重复记录。</string>
+    <string name="delivery_unreachable">无法连接到 Windows 接收端。</string>
+    <string name="delivery_rejected">地址、消息或接收请求无效。请使用私有 IPv4 地址，正文上限为 64 KiB。</string>
+    <string name="delivery_invalid_response">接收端返回了无效的确认。</string>
+    <string name="delivery_permission">请允许访问局域网，然后再次点击发送。</string>
+    <string name="receiver_starting">正在启动开发接收服务…</string>
+    <string name="receiver_listening">开发接收服务正在监听 8765 端口，传输未加密。</string>
+    <string name="receiver_failed">无法启动接收服务，请检查监听端口和历史存储。</string>
+    <string name="receiver_disabled">开发接收服务未启用。</string>
+    <string name="copy_message">复制</string>
 </resources>

@@ -16,6 +16,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
 
     implementation(libs.compose.uiToolingPreview)
+    implementation(libs.ktor.client.core)
     debugImplementation(libs.compose.uiTooling)
 }
 

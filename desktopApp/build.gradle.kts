@@ -13,6 +13,11 @@ dependencies {
     implementation(libs.kotlinx.coroutinesSwing)
 
     implementation(libs.compose.uiToolingPreview)
+    implementation(libs.ktor.server.netty)
+    implementation(libs.serialization.json)
+    implementation(libs.sqlite.jdbc)
+    testImplementation(libs.kotlin.testJunit)
+    testImplementation(libs.ktor.server.test)
 }
 
 compose.desktop {
