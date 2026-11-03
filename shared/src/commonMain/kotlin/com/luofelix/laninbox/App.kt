@@ -1,47 +1,61 @@
 package com.luofelix.laninbox
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.painterResource
-
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.luofelix.laninbox.feature.inbox.InboxScreen
+import com.luofelix.laninbox.feature.send.SendScreen
 import laninbox.shared.generated.resources.Res
-import laninbox.shared.generated.resources.compose_multiplatform
+import laninbox.shared.generated.resources.app_name
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
-@Preview
+@OptIn(ExperimentalMaterial3Api::class)
 fun App() {
-    MaterialTheme {
-        var showContent by remember { mutableStateOf(false) }
-        Column(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .safeContentPadding()
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Button(onClick = { showContent = !showContent }) {
-                Text("Click me!")
-            }
-            AnimatedVisibility(showContent) {
-                val greeting = remember { Greeting().greet() }
+    val model = viewModel { AppViewModel() }
+    val state by model.uiState.collectAsStateWithLifecycle()
+
+    LanInboxTheme {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.safeContentPadding()) {
+                Text(
+                    text = stringResource(Res.string.app_name),
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.padding(16.dp),
+                )
+                PrimaryTabRow(selectedTabIndex = state.destination.ordinal) {
+                    AppDestination.entries.forEach { destination ->
+                        Tab(
+                            selected = state.destination == destination,
+                            onClick = { model.select(destination) },
+                            text = { Text(stringResource(destination.label)) },
+                        )
+                    }
+                }
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Image(painterResource(Res.drawable.compose_multiplatform), null)
-                    Text("Compose: $greeting")
+                    when (state.destination) {
+                        AppDestination.Send -> SendScreen(state.draft, model::editDraft)
+                        AppDestination.Inbox -> InboxScreen()
+                    }
                 }
             }
         }

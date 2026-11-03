@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">LanInbox</string>
+    <string name="tab_send">Send</string>
+    <string name="tab_inbox">Inbox</string>
+    <string name="send_draft">Text, link, or code</string>
+    <string name="send_unavailable">Sending is unavailable in this build.</string>
+    <string name="inbox_empty">No messages yet.</string>
+</resources>

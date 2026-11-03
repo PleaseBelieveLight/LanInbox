@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">局域网快传</string>
+    <string name="tab_send">发送</string>
+    <string name="tab_inbox">收件箱</string>
+    <string name="send_draft">文字、链接或代码</string>
+    <string name="send_unavailable">当前版本暂未开放发送功能。</string>
+    <string name="inbox_empty">暂无消息。</string>
+</resources>
