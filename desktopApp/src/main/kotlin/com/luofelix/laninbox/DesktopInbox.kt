@@ -15,6 +15,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 internal class DesktopInbox(private val file: Path) {
+    // Serialize writes and snapshot publication so concurrent requests cannot publish stale history.
     private val mutex = Mutex()
     private val currentMessages = MutableStateFlow<List<InboxMessage>>(emptyList())
     val messages = currentMessages.asStateFlow()
@@ -27,6 +28,7 @@ internal class DesktopInbox(private val file: Path) {
             }
             check(version in 0..1) { "Unsupported inbox schema version" }
             if (version == 0) {
+                // Commit the schema and its version together so initialization can be retried.
                 connection.autoCommit = false
                 statement.executeUpdate(
                     """
@@ -48,6 +50,11 @@ internal class DesktopInbox(private val file: Path) {
         refresh(connection)
     }
 
+    /**
+     * Returns true after inserting the message or finding an identical saved message.
+     * Returns false if the same sender and message ID already identify different content or kind.
+     * Storage failures propagate to the caller.
+     */
     suspend fun save(message: MessageRequest): Boolean = access { connection ->
         val inserted = connection.prepareStatement(
             "INSERT INTO inbox(sender_id, message_id, kind, content) VALUES (?, ?, ?, ?) " +

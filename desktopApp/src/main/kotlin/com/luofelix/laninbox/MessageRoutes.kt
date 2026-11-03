@@ -32,6 +32,7 @@ internal fun Application.messageRoutes(inbox: DesktopInbox, logger: AppLogger) {
                 )
                 return@post
             }
+            // Read one extra byte to detect an oversized body without buffering the entire request.
             val bytes = call.receiveChannel().readRemaining(MAX_REQUEST_BYTES.toLong() + 1)
                 .readByteArray()
             if (bytes.size > MAX_REQUEST_BYTES) {
@@ -64,6 +65,7 @@ internal fun Application.messageRoutes(inbox: DesktopInbox, logger: AppLogger) {
             } catch (_: IOException) {
                 null
             }
+            // Acknowledge only after persistence so a failed write cannot appear as delivered.
             val (status, body) = when (saved) {
                 true -> HttpStatusCode.OK to MessageJson.encodeToString(MessageAcknowledgment(message.messageId))
                 false -> HttpStatusCode.Conflict to MessageJson.encodeToString(ProtocolError("message_id_conflict"))

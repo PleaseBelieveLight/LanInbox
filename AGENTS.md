@@ -38,6 +38,23 @@ Use `kotlin.test` and name test classes `*Test` with behavior-focused methods. P
 `shared/src/commonTest` and platform tests in `shared/src/androidHostTest` or `shared/src/jvmTest`.
 Cover behavior changes with focused tests.
 
+## Code Comments and KDoc
+
+- Use English KDoc for contracts callers rely on, including return values, side effects, and
+  guarantees. For example, document when `DesktopInbox.save` accepts a replay and when it rejects
+  a conflicting message ID. Document what `AppLogger` callers must omit from logs.
+- Add short English comments next to code that enforces a non-obvious invariant or platform
+  constraint. Explain why retries reuse a message ID, why the receiver acknowledges only after
+  persistence, and why the request body limit allows for JSON escaping.
+- Explain the rationale at network and lifecycle boundaries. Examples include disabling HTTP
+  redirects, restricting cleartext access to development mode, and stopping the desktop receiver
+  when its owning coroutine is canceled.
+- Put cross-platform protocol contracts in developer documentation, including retry semantics,
+  acknowledgment rules, and error codes. Keep that documentation and nearby comments in sync
+  with behavior changes.
+- Use clear names for straightforward code. Reserve comments for details a reader cannot infer
+  from the code itself.
+
 ## Language Policy
 
 - Use English for code identifiers, test names, API paths, JSON fields, and error codes. Write

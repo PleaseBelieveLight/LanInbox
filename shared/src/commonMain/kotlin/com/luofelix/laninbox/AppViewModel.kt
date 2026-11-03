@@ -32,9 +32,12 @@ internal data class AppUiState(
     val result: DeliveryResult? = null,
 )
 
+/** Keeps the draft and delivery state when the shared UI switches tabs. */
 internal class AppViewModel(initialDraft: String) : ViewModel() {
     private val mutableUiState = MutableStateFlow(AppUiState(draft = initialDraft))
     val uiState = mutableUiState.asStateFlow()
+
+    // A lost acknowledgment can follow a successful save. Reuse the original ID on retry.
     private var pending: MessageRequest? = null
 
     fun select(destination: AppDestination) {
@@ -55,6 +58,7 @@ internal class AppViewModel(initialDraft: String) : ViewModel() {
 
     private fun edit(transform: (AppUiState) -> AppUiState) {
         if (uiState.value.sending) return
+        // Editing the destination or payload starts a new logical delivery.
         pending = null
         mutableUiState.update { transform(it).copy(result = null) }
     }

@@ -27,11 +27,13 @@ enum class DeliveryResult {
 }
 
 fun interface MessageSender {
+    /** Returns [DeliveryResult.Delivered] after the receiver acknowledges this message ID. */
     suspend fun send(address: String, message: MessageRequest): DeliveryResult
 }
 
 class DevelopmentMessageSender(
     private val client: HttpClient = HttpClient {
+        // Keep cleartext requests on the validated private IPv4 endpoint.
         followRedirects = false
         install(HttpTimeout) {
             connectTimeoutMillis = 3_000
@@ -48,6 +50,7 @@ class DevelopmentMessageSender(
                     setBody(MessageJson.encodeToString(message))
                 }.execute { response ->
                     if (response.status != HttpStatusCode.OK) return@execute DeliveryResult.Rejected
+                    // Read one extra byte to detect an oversized acknowledgment.
                     val bytes = response.bodyAsChannel().readRemaining(1025).readByteArray()
                     if (bytes.size > 1024) return@execute DeliveryResult.InvalidResponse
                     val acknowledgment = MessageJson.decodeFromString<MessageAcknowledgment>(bytes.decodeToString())

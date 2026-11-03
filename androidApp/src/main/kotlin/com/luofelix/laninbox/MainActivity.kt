@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
             logger.info("Android activity started")
         }
 
+        // Match the debug manifest's cleartext policy when wiring the development sender.
         val developmentMode = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
         val sender = if (developmentMode) {
             val client = DevelopmentMessageSender()
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
                 if (Build.VERSION.SDK_INT >= 37 &&
                     checkSelfPermission(LOCAL_NETWORK) != PackageManager.PERMISSION_GRANTED
                 ) {
+                    // Leave the draft pending so the user can retry after granting access.
                     localNetworkPermission.launch(LOCAL_NETWORK)
                     DeliveryResult.PermissionRequired
                 } else {
@@ -68,6 +70,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun loadSenderId(): String {
+        // Keep a stable sender ID for the receiver's deduplication key.
         val settings = getSharedPreferences("laninbox_development", MODE_PRIVATE)
         return settings.getString("sender_id", null) ?: UUID.randomUUID().toString().also {
             settings.edit().putString("sender_id", it).apply()

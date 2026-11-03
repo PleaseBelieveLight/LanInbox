@@ -24,6 +24,7 @@ import kotlinx.coroutines.withContext
 private val logger = AppLogger { event -> println("[INFO] LanInbox: $event") }
 
 fun main() = application {
+    // Require explicit opt-in before exposing an unauthenticated cleartext listener on the LAN.
     val enabled = System.getenv("LANINBOX_DEV_RECEIVER") == "1"
     val inbox = remember {
         val directory = System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home")
@@ -52,6 +53,7 @@ fun main() = application {
                 logger.info("Development receiver listening port=$DEVELOPMENT_PORT")
                 awaitCancellation()
             } finally {
+                // The application effect is canceled on exit. Let Netty finish shutting down.
                 withContext(NonCancellable + Dispatchers.IO) { server.stop(500, 1_500) }
             }
         } catch (error: CancellationException) {

@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 const val MESSAGE_ROUTE = "/v1/messages"
 const val DEVELOPMENT_PORT = 8765
 const val MAX_MESSAGE_BYTES = 64 * 1024
+// A single content byte can expand to a six-byte JSON escape. Leave room for the envelope.
 const val MAX_REQUEST_BYTES = MAX_MESSAGE_BYTES * 6 + 1024
 
 val MessageJson = Json { ignoreUnknownKeys = true }
