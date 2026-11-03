@@ -12,6 +12,8 @@ import androidx.compose.ui.window.application
 import com.luofelix.laninbox.core.logging.AppLogger
 import com.luofelix.laninbox.core.network.DEVELOPMENT_PORT
 import com.luofelix.laninbox.feature.inbox.ReceiverStatus
+import io.ktor.server.engine.applicationEnvironment
+import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import java.nio.file.Path
@@ -26,6 +28,7 @@ private val logger = AppLogger { event -> println("[INFO] LanInbox: $event") }
 fun main() = application {
     // Require explicit opt-in before exposing an unauthenticated cleartext listener on the LAN.
     val enabled = System.getenv("LANINBOX_DEV_RECEIVER") == "1"
+    val identityPath = System.getenv("LANINBOX_TLS_KEYSTORE")
     val inbox = remember {
         val directory = System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home")
         DesktopInbox(Path.of(directory, "LanInbox", "development-inbox.sqlite"))
@@ -38,19 +41,37 @@ fun main() = application {
         onDispose { logger.info("Desktop application stopped") }
     }
     LaunchedEffect(inbox) {
-        if (!enabled) return@LaunchedEffect
+        if (!enabled && identityPath == null) return@LaunchedEffect
         status = ReceiverStatus.Starting
         try {
-            inbox.initialize()
-            val server = embeddedServer(Netty, host = "0.0.0.0", port = DEVELOPMENT_PORT, configure = {
-                requestReadTimeoutSeconds = 10
-            }) {
-                messageRoutes(inbox, logger)
+            check(!enabled || identityPath == null) { "Select one receiver mode" }
+            val server = if (identityPath != null) {
+                withContext(Dispatchers.IO) {
+                    val password = System.getenv("LANINBOX_TLS_PASSWORD")
+                    require(!password.isNullOrEmpty()) { "The identity keystore requires a password" }
+                    desktopIdentityServer(Path.of(identityPath), password)
+                }
+            } else {
+                inbox.initialize()
+                embeddedServer(Netty, applicationEnvironment(), configure = {
+                    connector {
+                        host = "0.0.0.0"
+                        port = DEVELOPMENT_PORT
+                    }
+                    requestReadTimeoutSeconds = 10
+                }) {
+                    messageRoutes(inbox, logger)
+                }
             }
             try {
                 withContext(Dispatchers.IO) { server.start(wait = false) }
-                status = ReceiverStatus.Listening
-                logger.info("Development receiver listening port=$DEVELOPMENT_PORT")
+                if (identityPath == null) {
+                    status = ReceiverStatus.Listening
+                    logger.info("Development receiver listening port=$DEVELOPMENT_PORT")
+                } else {
+                    status = ReceiverStatus.IdentityListening
+                    logger.info("HTTPS identity probe listening on loopback")
+                }
                 awaitCancellation()
             } finally {
                 // The application effect is canceled on exit. Let Netty finish shutting down.
@@ -60,7 +81,7 @@ fun main() = application {
             throw error
         } catch (_: Exception) {
             status = ReceiverStatus.Failed
-            logger.info("Development receiver failed to start")
+            logger.info("Receiver failed to start")
         }
     }
     Window(

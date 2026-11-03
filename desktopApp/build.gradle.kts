@@ -18,6 +18,7 @@ dependencies {
     implementation(libs.sqlite.jdbc)
     testImplementation(libs.kotlin.testJunit)
     testImplementation(libs.ktor.server.test)
+    testImplementation(libs.ktor.tls.certificates)
 }
 
 compose.desktop {

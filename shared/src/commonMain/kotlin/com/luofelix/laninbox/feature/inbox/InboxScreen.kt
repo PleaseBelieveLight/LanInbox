@@ -27,6 +27,7 @@ internal fun InboxScreen(messages: List<InboxMessage>, status: ReceiverStatus) {
         ReceiverStatus.Disabled -> Res.string.receiver_disabled
         ReceiverStatus.Starting -> Res.string.receiver_starting
         ReceiverStatus.Listening -> Res.string.receiver_listening
+        ReceiverStatus.IdentityListening -> Res.string.receiver_identity_listening
         ReceiverStatus.Failed -> Res.string.receiver_failed
     }
     val clipboard = LocalClipboardManager.current

@@ -19,7 +19,8 @@
     <string name="delivery_permission">Allow local network access, then tap Send again.</string>
     <string name="receiver_starting">Starting development receiver…</string>
     <string name="receiver_listening">Development receiver listening on port 8765. Traffic is unencrypted.</string>
-    <string name="receiver_failed">Could not start the receiver. Check the listening port and inbox storage.</string>
+    <string name="receiver_identity_listening">HTTPS identity probe listening at 127.0.0.1:8443.</string>
+    <string name="receiver_failed">Could not start the receiver. Check the port and receiver configuration.</string>
     <string name="receiver_disabled">Development receiver is disabled.</string>
     <string name="copy_message">Copy</string>
 </resources>

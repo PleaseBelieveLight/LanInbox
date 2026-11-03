@@ -2,6 +2,8 @@
 
 [English](README.md)
 
+[桌面 TLS 开发联调](docs/desktop-tls.md)
+
 LanInbox 是一款 Kotlin Multiplatform 工具，可以在局域网内从 Android 向 Windows 发送文字、链接和代码。共享
 Compose 界面和协议代码位于 `shared`，两端应用入口分别位于 `androidApp` 和 `desktopApp`。
 

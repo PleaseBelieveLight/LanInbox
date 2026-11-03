@@ -19,7 +19,8 @@
     <string name="delivery_permission">请允许访问局域网，然后再次点击发送。</string>
     <string name="receiver_starting">正在启动开发接收服务…</string>
     <string name="receiver_listening">开发接收服务正在监听 8765 端口，传输未加密。</string>
-    <string name="receiver_failed">无法启动接收服务，请检查监听端口和历史存储。</string>
+    <string name="receiver_identity_listening">HTTPS 身份验证端点正在监听 127.0.0.1:8443。</string>
+    <string name="receiver_failed">无法启动接收服务，请检查端口和接收端配置。</string>
     <string name="receiver_disabled">开发接收服务未启用。</string>
     <string name="copy_message">复制</string>
 </resources>

@@ -2,6 +2,8 @@
 
 [简体中文](README.zh-CN.md)
 
+[Desktop TLS development setup](docs/desktop-tls.md)
+
 LanInbox is a Kotlin Multiplatform app for sending text, links, and code from Android to Windows
 over a local network. Shared Compose UI and protocol code live in `shared`. The app entry points
 live in `androidApp` and `desktopApp`.
