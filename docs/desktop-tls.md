@@ -37,8 +37,25 @@ $certificate = Join-Path $env:LOCALAPPDATA 'LanInbox/identity.p12.pem'
 curl.exe --cacert $certificate https://127.0.0.1:8443/v1/identity
 ```
 
-The probe serves identity information only and cannot run alongside the cleartext development
-receiver. LAN message submissions will require authenticated pairing and a revocable credential.
+The loopback HTTPS listener also supports local pairing and cannot run alongside the cleartext
+development receiver. It does not expose message submission.
+
+## Exercise local pairing
+
+Select **Create local pairing invitation** in the desktop window. Send the displayed code as
+`{"code":"<invitation>"}` in a JSON body to `POST /v1/pairing` over the trusted TLS connection.
+The code expires after two minutes and can be redeemed once. Creating another invitation
+invalidates the previous one. A failed or replayed redemption returns HTTP 400 with
+`invalid_pairing_invitation`.
+
+Successful redemption returns HTTP 200 and a JSON `credential`. Send it in the
+`Authorization: Bearer <credential>` header to `GET /v1/pairing/session`. A valid credential
+returns HTTP 204. A missing or invalid credential returns HTTP 401. The desktop app holds one
+credential in memory. Successful re-pairing replaces it. **Clear invitation and revoke session**
+or restarting the app invalidates it. Keep the invitation and credential out of URLs, shell
+history, and logs.
 
 Run `./gradlew :desktopApp:test --tests '*DesktopIdentityServerTest'` to check trusted TLS,
 rejection of an untrusted certificate, the fingerprint of the handshake key, and route isolation.
+Run `./gradlew :desktopApp:test --tests '*PairingRoutesTest'` to check expiration, concurrent
+redemption, and revocation.

@@ -11,6 +11,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.luofelix.laninbox.core.logging.AppLogger
 import com.luofelix.laninbox.core.network.DEVELOPMENT_PORT
+import com.luofelix.laninbox.feature.inbox.PairingPanel
 import com.luofelix.laninbox.feature.inbox.ReceiverStatus
 import io.ktor.server.engine.applicationEnvironment
 import io.ktor.server.engine.connector
@@ -34,6 +35,8 @@ fun main() = application {
         DesktopInbox(Path.of(directory, "LanInbox", "development-inbox.sqlite"))
     }
     val messages by inbox.messages.collectAsState()
+    val pairing = remember { DesktopPairingSession() }
+    val invitation by pairing.invitation.collectAsState()
     var status by remember { mutableStateOf(ReceiverStatus.Disabled) }
 
     DisposableEffect(Unit) {
@@ -49,7 +52,7 @@ fun main() = application {
                 withContext(Dispatchers.IO) {
                     val password = System.getenv("LANINBOX_TLS_PASSWORD")
                     require(!password.isNullOrEmpty()) { "The identity keystore requires a password" }
-                    desktopIdentityServer(Path.of(identityPath), password)
+                    desktopIdentityServer(Path.of(identityPath), password, pairing = pairing)
                 }
             } else {
                 inbox.initialize()
@@ -88,6 +91,10 @@ fun main() = application {
         onCloseRequest = ::exitApplication,
         title = "LanInbox",
     ) {
-        App(messages = messages, receiverStatus = status, inboxOnly = true)
+        App(messages = messages, receiverStatus = status, inboxOnly = true) {
+            if (status == ReceiverStatus.IdentityListening) {
+                PairingPanel(invitation, pairing::issueInvitation, pairing::revoke)
+            }
+        }
     }
 }

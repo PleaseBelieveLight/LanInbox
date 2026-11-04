@@ -11,6 +11,8 @@ const val MAX_REQUEST_BYTES = MAX_MESSAGE_BYTES * 6 + 1024
 
 val MessageJson = Json { ignoreUnknownKeys = true }
 
+private val messageIdentifier = Regex("[a-zA-Z0-9_-]{1,64}")
+
 @Serializable
 enum class MessageKind {
     Text, Link, Code,
@@ -24,12 +26,8 @@ data class MessageRequest(
     val content: String,
 ) {
     fun isValid(): Boolean =
-        identifier.matches(senderId) && identifier.matches(messageId) &&
+        messageIdentifier.matches(senderId) && messageIdentifier.matches(messageId) &&
             content.isNotBlank() && content.encodeToByteArray().size <= MAX_MESSAGE_BYTES
-
-    private companion object {
-        val identifier = Regex("[a-zA-Z0-9_-]{1,64}")
-    }
 }
 
 @Serializable

@@ -20,13 +20,14 @@ private const val KEY_ALIAS = "laninbox"
 private const val IDENTITY_PORT = 8443
 
 /**
- * Loads an operator-provisioned identity and exposes a local HTTPS probe.
+ * Loads an operator-provisioned identity and exposes local HTTPS identity and pairing routes.
  * Keep the connector on loopback until the LAN routes enforce device authentication.
  */
 internal fun desktopIdentityServer(
     keyStorePath: Path,
     password: String,
     port: Int = IDENTITY_PORT,
+    pairing: DesktopPairingSession = DesktopPairingSession(),
 ) = run {
     val keyStore = KeyStore.getInstance("PKCS12")
     Files.newInputStream(keyStorePath).use { keyStore.load(it, password.toCharArray()) }
@@ -40,6 +41,7 @@ internal fun desktopIdentityServer(
     val fingerprint = "sha256/${Base64.getEncoder().encodeToString(digest)}"
 
     embeddedServer(Netty, applicationEnvironment(), configure = {
+        requestReadTimeoutSeconds = 10
         sslConnector(
             keyStore = keyStore,
             keyAlias = KEY_ALIAS,
@@ -51,6 +53,7 @@ internal fun desktopIdentityServer(
         }
     }) {
         routing {
+            pairingRoutes(pairing)
             get("/v1/identity") {
                 call.respondText(fingerprint, ContentType.Text.Plain)
             }

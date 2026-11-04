@@ -23,4 +23,7 @@
     <string name="receiver_failed">Could not start the receiver. Check the port and receiver configuration.</string>
     <string name="receiver_disabled">Development receiver is disabled.</string>
     <string name="copy_message">Copy</string>
+    <string name="pairing_issue_invitation">Create local pairing invitation</string>
+    <string name="pairing_invitation_hint">This invitation expires two minutes after creation.</string>
+    <string name="pairing_revoke">Clear invitation and revoke session</string>
 </resources>

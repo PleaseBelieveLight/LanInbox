@@ -37,6 +37,7 @@ fun App(
     messages: List<InboxMessage> = emptyList(),
     receiverStatus: ReceiverStatus = ReceiverStatus.Disabled,
     inboxOnly: Boolean = false,
+    inboxActions: @Composable () -> Unit = {},
 ) {
     val model = viewModel { AppViewModel(initialDraft) }
     val state by model.uiState.collectAsStateWithLifecycle()
@@ -59,7 +60,7 @@ fun App(
                     }
                 }
                 if (inboxOnly || state.destination == AppDestination.Inbox) {
-                    InboxScreen(messages, receiverStatus)
+                    InboxScreen(messages, receiverStatus, inboxActions)
                 } else {
                     Column(
                         modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),

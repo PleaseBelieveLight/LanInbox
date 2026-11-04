@@ -22,7 +22,11 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 @Suppress("DEPRECATION")
-internal fun InboxScreen(messages: List<InboxMessage>, status: ReceiverStatus) {
+internal fun InboxScreen(
+    messages: List<InboxMessage>,
+    status: ReceiverStatus,
+    inboxActions: @Composable () -> Unit,
+) {
     val statusLabel = when (status) {
         ReceiverStatus.Disabled -> Res.string.receiver_disabled
         ReceiverStatus.Starting -> Res.string.receiver_starting
@@ -35,7 +39,12 @@ internal fun InboxScreen(messages: List<InboxMessage>, status: ReceiverStatus) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { Text(stringResource(statusLabel)) }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(statusLabel))
+                inboxActions()
+            }
+        }
         if (messages.isEmpty()) item { Text(stringResource(Res.string.inbox_empty)) }
         items(messages, key = { "${it.request.senderId}:${it.request.messageId}" }) { (message) ->
             Column {

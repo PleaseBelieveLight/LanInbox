@@ -23,4 +23,7 @@
     <string name="receiver_failed">无法启动接收服务，请检查端口和接收端配置。</string>
     <string name="receiver_disabled">开发接收服务未启用。</string>
     <string name="copy_message">复制</string>
+    <string name="pairing_issue_invitation">生成本机配对邀请</string>
+    <string name="pairing_invitation_hint">邀请在生成两分钟后失效。</string>
+    <string name="pairing_revoke">清除邀请并撤销会话</string>
 </resources>

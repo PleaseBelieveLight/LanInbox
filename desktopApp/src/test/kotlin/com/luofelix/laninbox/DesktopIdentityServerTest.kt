@@ -1,5 +1,6 @@
 package com.luofelix.laninbox
 
+import com.luofelix.laninbox.core.network.MessageJson
 import io.ktor.network.tls.certificates.buildKeyStore
 import io.ktor.network.tls.extensions.HashAlgorithm
 import java.net.URI
@@ -17,11 +18,14 @@ import javax.net.ssl.TrustManagerFactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class DesktopIdentityServerTest {
     @Test
-    fun exposesOnlyTheIdentityProbeOverTrustedLoopbackTls() {
+    fun pairsOverTrustedLoopbackTlsWithoutExposingMessageSubmission() {
         val file = Files.createTempFile("laninbox-identity", ".p12")
         val password = "test-password"
         try {
@@ -33,7 +37,8 @@ class DesktopIdentityServerTest {
                 }
             }
             Files.newOutputStream(file).use { keyStore.store(it, password.toCharArray()) }
-            val server = desktopIdentityServer(file, password, port = 0)
+            val pairing = DesktopPairingSession()
+            val server = desktopIdentityServer(file, password, port = 0, pairing = pairing)
             try {
                 server.start(wait = false)
                 val connector = runBlocking { server.engine.resolvedConnectors().single() }
@@ -61,6 +66,26 @@ class DesktopIdentityServerTest {
                 val hash = MessageDigest.getInstance("SHA-256").digest(peerKey.encoded)
                 assertEquals(200, response.statusCode())
                 assertEquals("sha256/${Base64.getEncoder().encodeToString(hash)}", response.body())
+
+                pairing.issueInvitation()
+                val code = assertNotNull(pairing.invitation.value)
+                val redemption = HttpRequest.newBuilder(URI.create("$baseUrl/v1/pairing"))
+                    .timeout(Duration.ofSeconds(5))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString("""{"code":"$code"}"""))
+                    .build()
+                val paired = client.send(redemption, HttpResponse.BodyHandlers.ofString())
+                assertEquals(200, paired.statusCode())
+                assertEquals(400, client.send(redemption, HttpResponse.BodyHandlers.discarding()).statusCode())
+                val credential = MessageJson.parseToJsonElement(paired.body())
+                    .jsonObject.getValue("credential").jsonPrimitive.content
+                val sessionRequest = HttpRequest.newBuilder(URI.create("$baseUrl/v1/pairing/session"))
+                    .timeout(Duration.ofSeconds(5))
+                    .header("Authorization", "Bearer $credential")
+                    .build()
+                assertEquals(204, client.send(sessionRequest, HttpResponse.BodyHandlers.discarding()).statusCode())
+                pairing.revoke()
+                assertEquals(401, client.send(sessionRequest, HttpResponse.BodyHandlers.discarding()).statusCode())
 
                 val messageRequest = HttpRequest.newBuilder(URI.create("$baseUrl/v1/messages"))
                     .timeout(Duration.ofSeconds(5))
