@@ -2,43 +2,53 @@
 
 [English](README.md)
 
-[桌面 TLS 开发联调](docs/desktop-tls.md)
+**LanInbox 是 Android 和 Windows 之间的局域网收件箱。** 把手机上的网页链接发到电脑接着看，或把电脑上的
+截图发回手机。文字、链接、代码片段、图片和文件都在同一局域网内直接传输。
 
-LanInbox 是一款 Kotlin Multiplatform 工具，可以在 Android 和 Windows 之间通过局域网互传文字、链接、代码、
-文件和图片。共享 Compose 界面和协议代码位于 `shared`，两端应用入口分别位于 `androidApp` 和 `desktopApp`。
+![传输示意图，Android 向 Windows 发送链接，Windows 通过 HTTPS 发回图片](docs/assets/lan-transfer.svg)
 
-## 双向 HTTPS 快传
+## 功能亮点
 
-1. 启动 Windows 版局域网快传。应用会创建本机身份并启动 HTTPS 接收端。
-2. 让 Android 和电脑连入同一局域网。在 Windows 生成配对邀请，在 Android 扫描二维码。也可以手动输入
-   Windows 地址、公钥指纹和邀请。系统要求局域网权限时，授权后重试。
-3. 两端都可以发送文字或选择文件、图片。Windows 向手机发送时，保持 Android 应用在前台。
-4. 在收件箱复制文字、预览图片、另存文件或清理历史。传输中断后重试会从文件开头重新传输。
+- **从 Android 分享菜单发送链接。** 将链接或文字分享到局域网快传，内容会填入发送草稿，确认后就能发到
+  Windows 收件箱。
+- **扫二维码配对，双向加密传输。** 扫描电脑上生成的配对二维码后，两端就可以通过 HTTPS 收发。
+- **电脑换 IP 后仍能找回。** 重启应用后会保留配对记录，手机可以在局域网内重新发现已配对的电脑。
+- **收到就能用。** 在收件箱复制文字和代码、预览支持的图片，或把文件另存到所需的位置。
 
-配对在两端重启后保留。电脑换 IP 后，Android 会通过局域网发现重新定位原设备。具体见[连接与故障排查](docs/desktop-tls.md)。
+## 安装与试用
 
-## 联调文本快传
+在仓库的 **Actions** 页面打开一次成功的 **Verify LanInbox** 构建，从 **Artifacts** 下载并解压
+`laninbox-verification-builds`。在 Android 安装调试版 APK，在 Windows 安装 MSI。也可以按页末的步骤从源码构建。
 
-1. 在 Android 真机运行 Debug 版，让手机和 Windows 连接到同一局域网。
-2. 在 Windows PowerShell 启用开发接收端。
+### 发送第一条链接
 
-   ```powershell
-   $env:LANINBOX_DEV_RECEIVER = '1'
-   .\gradlew.bat :desktopApp:run
-   ```
+1. 让手机和电脑连到同一局域网，在两端打开 LanInbox。
+2. 在 Windows 点击 **生成配对邀请**，再用 Android 应用中的 **扫描配对二维码** 扫描电脑上的二维码。
+3. 在 Android 的发送页粘贴 `https://example.com`，点击 **发送**。打开 Windows 的 **收件箱** 即可复制链接。
 
-3. 在手机输入 Windows 的局域网 IPv4 地址，默认端口为 `8765`。粘贴文本或通过其他应用分享文本后，点击
-   **发送**。如遇局域网权限提示，授权后再次点击发送。
-4. 在 Windows 收件箱复制收到的内容。超时时保留原草稿和地址直接重试。重启接收端可以检查历史是否保留。
+想试试反方向传输，可以在 Windows 应用里选一张图片发给手机。保持 Android 应用在前台，直到图片出现在收件箱里。
 
-开发传输未经认证，也未加密。仅在可信局域网启用接收端。Windows 防火墙可能需要在专用网络配置下允许 TCP
-`8765` 入站。收件箱显示最新 100 条，开发历史存放在 `%LOCALAPPDATA%/LanInbox/development-inbox.sqlite`。
+### 连接排查
 
-## 构建和测试
+- **手动配对。** 在 Android 应用中填写 Windows 端显示的局域网地址、证书指纹和配对邀请。
+- **检查局域网权限。** Android 提示时授予局域网访问权限，并在 Windows 防火墙中允许 LanInbox 在专用网络上通信。
+- **电脑换 IP 后重连。** 如果自动发现失败，输入电脑当前的局域网地址，再点击 **重新连接已配对电脑**。
 
-- Android Debug APK 使用 `.\gradlew.bat :androidApp:assembleDebug` 构建。
-- 桌面应用使用 `.\gradlew.bat :desktopApp:run` 启动，也可运行
-  `.\gradlew.bat :desktopApp:hotRun --auto` 使用 Compose 热重载。
-- 使用 `.\gradlew.bat :shared:testAndroidHostTest :shared:jvmTest :desktopApp:test` 运行主机单测和桌面接收端测试。
-- 安装 JDK 21 和 WiX 3.14.1 后，使用 `.\gradlew.bat :desktopApp:packageMsi` 构建 Windows 安装包。
-  见[发布验收清单](docs/release-verification.md)。
+## 项目结构
+
+项目使用 Kotlin Multiplatform 和 Compose Multiplatform。
+
+- [`shared/`](shared) 包含共享界面、传输协议和 HTTPS 客户端。
+- [`androidApp/`](androidApp) 包含 Android 应用和平台适配。
+- [`desktopApp/`](desktopApp) 包含 Windows 应用、局域网接收服务和 MSI 打包配置。
+
+## 从源码构建
+
+在 Android Studio 中打开仓库，使用 JDK 21 和 Android SDK Platform 37 完成 Gradle 同步。
+将 `JAVA_HOME` 指向 JDK 21，再在 Windows PowerShell 中从仓库根目录运行以下命令。
+
+- 构建 Android APK 使用 `.\gradlew.bat :androidApp:assembleDebug`，产物在
+  `androidApp/build/outputs/apk/debug/`。
+- 启动 Windows 应用使用 `.\gradlew.bat :desktopApp:run`。
+- 打包 Windows MSI 需要 WiX 3.14.1。将 `WIX_PATH` 设为 `candle.exe` 和 `light.exe` 所在目录，再运行
+  `.\gradlew.bat :desktopApp:packageMsi`。
