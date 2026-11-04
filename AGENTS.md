@@ -35,6 +35,11 @@ Use four spaces and follow Kotlin conventions. Keep packages under `com.luofelix
 PascalCase for types and UI composables and lowerCamelCase for ordinary functions and properties.
 Manage dependency versions in `gradle/libs.versions.toml`.
 
+- Update Android `SharedPreferences` with the `androidx.core.content.edit` extension, for example
+  `preferences.edit { putString("sender_id", it) }`.
+- Pass a `Duration` to coroutine `delay` using `kotlin.time.Duration.Companion.milliseconds`, for
+  example `delay(1_500.milliseconds)`.
+
 Use `kotlin.test` and name test classes `*Test` with behavior-focused methods. Put portable tests in
 `shared/src/commonTest` and platform tests in `shared/src/androidHostTest` or `shared/src/jvmTest`.
 Cover behavior changes with focused tests.

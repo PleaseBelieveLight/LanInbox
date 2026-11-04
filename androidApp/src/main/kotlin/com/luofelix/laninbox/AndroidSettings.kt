@@ -5,6 +5,7 @@ import android.util.Log
 import com.luofelix.laninbox.core.logging.AppLogger
 import com.luofelix.laninbox.core.logging.LogLevel
 import java.util.UUID
+import androidx.core.content.edit
 
 internal val androidLogger = AppLogger { event ->
     when (event.level) {
@@ -18,6 +19,6 @@ internal class AndroidSettings(context: Context) {
 
     /** Keeps a stable sender ID for the receiver's deduplication key. */
     fun senderId(): String = preferences.getString("sender_id", null) ?: UUID.randomUUID().toString().also {
-        preferences.edit().putString("sender_id", it).apply()
+        preferences.edit { putString("sender_id", it) }
     }
 }

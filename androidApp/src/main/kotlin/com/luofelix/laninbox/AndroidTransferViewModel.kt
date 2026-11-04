@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.milliseconds
 
 internal data class FileTransferState(
     val status: TransferStatus? = null,
@@ -226,7 +227,7 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
                     received.value = FileTransferState(TransferStatus.Delivered, attachment?.name, 1f)
                     downloading = false
                 }
-                delay(1_500)
+                delay(1_500.milliseconds)
             }
         } catch (error: CancellationException) {
             throw error
