@@ -30,10 +30,16 @@ kotlin {
        }
     }
     sourceSets {
+        androidMain.get().kotlin.srcDir("src/jvmAndAndroidMain/kotlin")
+        jvmMain.get().kotlin.srcDir("src/jvmAndAndroidMain/kotlin")
         androidMain.dependencies {
             implementation(libs.ktor.client.cio)
+            implementation(libs.okhttp)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
+        }
+        jvmMain.dependencies {
+            implementation(libs.okhttp)
         }
         commonMain.dependencies {
             implementation(libs.ktor.client.core)

@@ -45,11 +45,7 @@ internal fun Route.pairingRoutes(session: DesktopPairingSession) {
 
     get("/v1/pairing/session") {
         call.response.header(HttpHeaders.CacheControl, "no-store")
-        val authorization = call.request.headers[HttpHeaders.Authorization].orEmpty()
-        val credential = authorization.substringAfter(' ', "")
-        if (authorization.substringBefore(' ').equals("Bearer", ignoreCase = true) &&
-            session.accepts(credential)
-        ) {
+        if (session.acceptsAuthorization(call.request.headers[HttpHeaders.Authorization])) {
             call.respond(HttpStatusCode.NoContent)
         } else {
             call.response.header(HttpHeaders.WWWAuthenticate, "Bearer")

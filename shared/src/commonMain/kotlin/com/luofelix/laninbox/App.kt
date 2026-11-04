@@ -16,10 +16,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.luofelix.laninbox.feature.inbox.InboxScreen
+import com.luofelix.laninbox.core.network.AttachmentInfo
 import com.luofelix.laninbox.feature.inbox.InboxMessage
 import com.luofelix.laninbox.feature.inbox.ReceiverStatus
 import com.luofelix.laninbox.feature.send.MessageSender
@@ -38,6 +40,11 @@ fun App(
     receiverStatus: ReceiverStatus = ReceiverStatus.Disabled,
     inboxOnly: Boolean = false,
     inboxActions: @Composable () -> Unit = {},
+    attachments: List<AttachmentInfo> = emptyList(),
+    previewAttachment: (suspend (AttachmentInfo) -> ImageBitmap?)? = null,
+    exportAttachment: ((AttachmentInfo) -> Unit)? = null,
+    sendActions: @Composable () -> Unit = {},
+    pairedAddress: String? = null,
 ) {
     val model = viewModel { AppViewModel(initialDraft) }
     val state by model.uiState.collectAsStateWithLifecycle()
@@ -60,18 +67,20 @@ fun App(
                     }
                 }
                 if (inboxOnly || state.destination == AppDestination.Inbox) {
-                    InboxScreen(messages, receiverStatus, inboxActions)
+                    InboxScreen(messages, receiverStatus, inboxActions, attachments, previewAttachment, exportAttachment)
                 } else {
                     Column(
                         modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
+                        sendActions()
                         SendScreen(
                             state = state,
                             onDraftChange = model::editDraft,
                             onAddressChange = model::editAddress,
                             onKindChange = model::selectKind,
-                            onSend = sender?.let { { model.send(senderId, it) } },
+                            onSend = sender?.let { { model.send(senderId, it, pairedAddress) } },
+                            paired = pairedAddress != null,
                         )
                     }
                 }

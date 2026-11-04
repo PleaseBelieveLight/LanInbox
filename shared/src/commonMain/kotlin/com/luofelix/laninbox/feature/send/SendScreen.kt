@@ -23,17 +23,20 @@ internal fun SendScreen(
     onAddressChange: (String) -> Unit,
     onKindChange: (MessageKind) -> Unit,
     onSend: (() -> Unit)?,
+    paired: Boolean = false,
 ) {
     if (onSend != null) {
-        Text(stringResource(Res.string.development_warning))
-        OutlinedTextField(
-            value = state.address,
-            onValueChange = onAddressChange,
-            label = { Text(stringResource(Res.string.receiver_address)) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            enabled = !state.sending,
-        )
+        if (!paired) {
+            Text(stringResource(Res.string.development_warning))
+            OutlinedTextField(
+                value = state.address,
+                onValueChange = onAddressChange,
+                label = { Text(stringResource(Res.string.receiver_address)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                enabled = !state.sending,
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MessageKind.entries.forEach { kind ->
                 FilterChip(

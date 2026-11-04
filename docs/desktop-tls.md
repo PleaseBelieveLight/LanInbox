@@ -1,10 +1,9 @@
 # Desktop TLS Identity Probe
 
-The Phase C probe exposes `GET /v1/identity` on `127.0.0.1:8443`. Its response is
+The desktop HTTPS receiver defaults to `127.0.0.1:8443`. `GET /v1/identity` returns
 `sha256/<base64>`, where the digest is SHA-256 over the leaf certificate's DER-encoded
-SubjectPublicKeyInfo. The response is diagnostic. Future pairing clients must verify the peer's
-public key during the TLS handshake against the fingerprint obtained from the desktop pairing QR
-code.
+SubjectPublicKeyInfo. Copy the fingerprint directly from the desktop app for pairing. Android
+checks both the pinned public key and the address in the certificate during the TLS handshake.
 
 ## Run the probe
 
@@ -37,12 +36,28 @@ $certificate = Join-Path $env:LOCALAPPDATA 'LanInbox/identity.p12.pem'
 curl.exe --cacert $certificate https://127.0.0.1:8443/v1/identity
 ```
 
-The loopback HTTPS listener also supports local pairing and cannot run alongside the cleartext
-development receiver. It does not expose message submission.
+The HTTPS listener cannot run alongside the cleartext development receiver. It supports
+authenticated text and attachment transfers in both directions.
+
+## Connect Android over the LAN
+
+1. Generate a separate keystore using the steps above. Replace the certificate's SAN argument
+   with `'SAN=IP:127.0.0.1,IP:192.168.1.25'`, using the actual private IPv4 address of the PC.
+2. Set `$env:LANINBOX_TLS_BIND = '192.168.1.25'` before running the desktop app with that
+   keystore. Allow TCP 8443 on the Windows private network profile if needed.
+3. Select **Create pairing invitation** on Windows. Enter the address, fingerprint, and
+   invitation shown on the PC into Android. Grant local network access if prompted, then retry.
+4. Send a text, link, code snippet, file, or image from either app. Keep Android in the foreground
+   when receiving. Both inboxes support saving files and previewing supported images.
+
+When the Windows IP changes, issue a certificate that covers the new address and pair again.
+The development receiver keeps one pairing session in memory and one pending outgoing delivery.
+Restarting Windows LanInbox discards pending deliveries and pairing credentials. Received
+items are kept on disk.
 
 ## Exercise local pairing
 
-Select **Create local pairing invitation** in the desktop window. Send the displayed code as
+Select **Create pairing invitation** in the desktop window. Send the displayed code as
 `{"code":"<invitation>"}` in a JSON body to `POST /v1/pairing` over the trusted TLS connection.
 The code expires after two minutes and can be redeemed once. Creating another invitation
 invalidates the previous one. A failed or replayed redemption returns HTTP 400 with

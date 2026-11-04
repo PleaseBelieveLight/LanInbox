@@ -14,9 +14,13 @@ dependencies {
     implementation(project(":shared"))
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.runtimeCompose)
 
     implementation(libs.compose.uiToolingPreview)
+    implementation(libs.compose.ui)
     implementation(libs.ktor.client.core)
+    implementation(libs.okhttp)
+    implementation(libs.serialization.json)
     debugImplementation(libs.compose.uiTooling)
 }
 

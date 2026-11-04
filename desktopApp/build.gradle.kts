@@ -13,6 +13,7 @@ dependencies {
     implementation(libs.kotlinx.coroutinesSwing)
 
     implementation(libs.compose.uiToolingPreview)
+    implementation(libs.compose.material3)
     implementation(libs.ktor.server.netty)
     implementation(libs.serialization.json)
     implementation(libs.sqlite.jdbc)

@@ -1,0 +1,109 @@
+package com.luofelix.laninbox.feature.send
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import com.luofelix.laninbox.core.network.MessageKind
+import laninbox.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+
+enum class TransferStatus { Preparing, Sending, Receiving, Delivered, Failed, Canceled, PermissionRequired }
+
+@Composable
+fun TransferControls(
+    status: TransferStatus?,
+    progress: Float? = null,
+    name: String? = null,
+    choose: (() -> Unit)? = null,
+    cancel: (() -> Unit)? = null,
+    retry: (() -> Unit)? = null,
+) {
+    name?.let { Text(it) }
+    status?.let {
+        val label = when (it) {
+            TransferStatus.Preparing -> Res.string.attachment_preparing
+            TransferStatus.Sending -> Res.string.sending
+            TransferStatus.Receiving -> Res.string.attachment_receiving
+            TransferStatus.Delivered -> Res.string.delivered
+            TransferStatus.Failed -> Res.string.attachment_failed
+            TransferStatus.Canceled -> Res.string.attachment_canceled
+            TransferStatus.PermissionRequired -> Res.string.delivery_permission
+        }
+        Text(stringResource(label))
+        if (it == TransferStatus.Sending || it == TransferStatus.Receiving) {
+            if (progress == null) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            else LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+        }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        choose?.let { OutlinedButton(onClick = it) { Text(stringResource(Res.string.attachment_choose)) } }
+        cancel?.let { OutlinedButton(onClick = it) { Text(stringResource(Res.string.attachment_cancel)) } }
+        retry?.let { OutlinedButton(onClick = it) { Text(stringResource(Res.string.attachment_retry)) } }
+    }
+}
+
+@Composable
+fun DesktopTextSend(enabled: Boolean, onSend: (String, MessageKind) -> Boolean) {
+    var text by remember { mutableStateOf("") }
+    var kind by remember { mutableStateOf(MessageKind.Text) }
+    var rejected by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { text = it; rejected = false },
+        label = { Text(stringResource(Res.string.send_draft)) },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        MessageKind.entries.forEach {
+            FilterChip(selected = kind == it, onClick = { kind = it }, label = { Text(stringResource(it.label())) })
+        }
+    }
+    Button(enabled = enabled && text.isNotBlank(), onClick = {
+        if (onSend(text, kind)) text = "" else rejected = true
+    }) { Text(stringResource(Res.string.send_to_phone)) }
+    if (rejected) Text(stringResource(Res.string.attachment_failed))
+}
+
+@Composable
+fun SecurePairingForm(
+    connected: Boolean,
+    busy: Boolean,
+    failed: Boolean,
+    onPair: (address: String, fingerprint: String, invitation: String) -> Unit,
+    onDisconnect: () -> Unit,
+) {
+    var address by remember { mutableStateOf("") }
+    var fingerprint by remember { mutableStateOf("") }
+    var invitation by remember { mutableStateOf("") }
+    if (connected) {
+        Text(stringResource(Res.string.secure_paired))
+        OutlinedButton(onClick = onDisconnect) { Text(stringResource(Res.string.secure_disconnect)) }
+    } else {
+        OutlinedTextField(address, { address = it }, label = { Text(stringResource(Res.string.receiver_address)) },
+            enabled = !busy, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(fingerprint, { fingerprint = it }, label = { Text(stringResource(Res.string.secure_fingerprint)) },
+            enabled = !busy, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(invitation, { invitation = it }, label = { Text(stringResource(Res.string.secure_invitation)) },
+            enabled = !busy, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation())
+        Button(
+            enabled = !busy && address.isNotBlank() && fingerprint.isNotBlank() && invitation.isNotBlank(),
+            onClick = { onPair(address, fingerprint, invitation) },
+        ) { Text(stringResource(Res.string.secure_pair)) }
+        if (failed) Text(stringResource(Res.string.secure_pair_failed))
+    }
+}

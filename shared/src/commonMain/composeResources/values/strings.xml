@@ -23,7 +23,25 @@
     <string name="receiver_failed">Could not start the receiver. Check the port and receiver configuration.</string>
     <string name="receiver_disabled">Development receiver is disabled.</string>
     <string name="copy_message">Copy</string>
-    <string name="pairing_issue_invitation">Create local pairing invitation</string>
+    <string name="pairing_issue_invitation">Create pairing invitation</string>
     <string name="pairing_invitation_hint">This invitation expires two minutes after creation.</string>
     <string name="pairing_revoke">Clear invitation and revoke session</string>
+    <string name="receiver_secure_listening">HTTPS receiver is listening on the local network.</string>
+    <string name="receiver_foreground">Receiving from Windows while LanInbox is in the foreground.</string>
+    <string name="attachment_bytes">%1$d bytes</string>
+    <string name="attachment_save">Save as</string>
+    <string name="attachment_preparing">Preparing the file…</string>
+    <string name="attachment_receiving">Receiving…</string>
+    <string name="attachment_failed">Transfer failed. Check the connection, file size, and available storage.</string>
+    <string name="attachment_canceled">Transfer canceled.</string>
+    <string name="attachment_choose">Choose file or image</string>
+    <string name="attachment_cancel">Cancel</string>
+    <string name="attachment_retry">Retry</string>
+    <string name="send_to_phone">Send to phone</string>
+    <string name="secure_fingerprint">Windows certificate fingerprint</string>
+    <string name="secure_invitation">Pairing invitation</string>
+    <string name="secure_pair">Pair over HTTPS</string>
+    <string name="secure_paired">Paired over HTTPS</string>
+    <string name="secure_disconnect">Disconnect</string>
+    <string name="secure_pair_failed">Pairing failed. Check the address, certificate fingerprint, and invitation.</string>
 </resources>

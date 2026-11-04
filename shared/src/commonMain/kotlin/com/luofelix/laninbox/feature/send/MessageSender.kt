@@ -5,6 +5,7 @@ import com.luofelix.laninbox.core.network.MESSAGE_ROUTE
 import com.luofelix.laninbox.core.network.MessageAcknowledgment
 import com.luofelix.laninbox.core.network.MessageJson
 import com.luofelix.laninbox.core.network.MessageRequest
+import com.luofelix.laninbox.core.network.privateLanAuthority
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.HttpRequestTimeoutException
@@ -74,18 +75,5 @@ class DevelopmentMessageSender(
     fun close() = client.close()
 }
 
-internal fun developmentEndpoint(address: String): String? {
-    val parts = address.trim().split(':')
-    if (parts.size > 2) return null
-    val octets = parts.first().split('.')
-    if (octets.size != 4 || octets.any { !it.matches(Regex("0|[1-9][0-9]{0,2}")) }) return null
-    val numbers = octets.map(String::toInt)
-    if (numbers.any { it !in 0..255 }) return null
-    val (first, second) = numbers
-    val privateAddress = first == 10 || first == 172 && second in 16..31 ||
-        first == 192 && second == 168
-    if (!privateAddress) return null
-    val port = if (parts.size == 2) parts[1].toIntOrNull() ?: return null else DEVELOPMENT_PORT
-    if (port !in 1..65535) return null
-    return "http://${parts.first()}:$port$MESSAGE_ROUTE"
-}
+internal fun developmentEndpoint(address: String): String? =
+    privateLanAuthority(address, DEVELOPMENT_PORT)?.let { "http://$it$MESSAGE_ROUTE" }

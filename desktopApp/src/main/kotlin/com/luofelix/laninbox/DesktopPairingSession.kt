@@ -15,6 +15,9 @@ internal class DesktopPairingSession(private val clock: TimeSource = TimeSource.
     val invitation = mutableInvitation.asStateFlow()
     private var issuedAt = clock.markNow()
     private var credentialDigest: ByteArray? = null
+    private var generation = 0L
+    private val mutableSession = MutableStateFlow<Long?>(null)
+    val activeSession = mutableSession.asStateFlow()
 
     @Synchronized
     fun issueInvitation() {
@@ -35,20 +38,28 @@ internal class DesktopPairingSession(private val clock: TimeSource = TimeSource.
         // Keep consumption and credential replacement atomic across concurrent requests.
         val credential = newSecret()
         credentialDigest = digest(credential)
+        mutableSession.value = ++generation
         mutableInvitation.value = null
         return credential
     }
 
     @Synchronized
-    fun accepts(credential: String): Boolean {
-        val expected = credentialDigest ?: return false
-        return credential.length == 43 && MessageDigest.isEqual(expected, digest(credential))
+    fun authorizedSession(authorization: String?): Long? {
+        val expected = credentialDigest ?: return null
+        if (authorization == null || !authorization.startsWith("Bearer ", ignoreCase = true)) return null
+        val credential = authorization.substring(7)
+        return mutableSession.value.takeIf {
+            credential.length == 43 && MessageDigest.isEqual(expected, digest(credential))
+        }
     }
+
+    fun acceptsAuthorization(authorization: String?): Boolean = authorizedSession(authorization) != null
 
     @Synchronized
     fun revoke() {
         mutableInvitation.value = null
         credentialDigest = null
+        mutableSession.value = null
     }
 
     private fun newSecret(): String =

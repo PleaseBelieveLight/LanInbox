@@ -23,7 +23,25 @@
     <string name="receiver_failed">无法启动接收服务，请检查端口和接收端配置。</string>
     <string name="receiver_disabled">开发接收服务未启用。</string>
     <string name="copy_message">复制</string>
-    <string name="pairing_issue_invitation">生成本机配对邀请</string>
+    <string name="pairing_issue_invitation">生成配对邀请</string>
     <string name="pairing_invitation_hint">邀请在生成两分钟后失效。</string>
     <string name="pairing_revoke">清除邀请并撤销会话</string>
+    <string name="receiver_secure_listening">HTTPS 接收端正在局域网监听。</string>
+    <string name="receiver_foreground">局域网快传在前台时可接收 Windows 发来的内容。</string>
+    <string name="attachment_bytes">%1$d 字节</string>
+    <string name="attachment_save">另存为</string>
+    <string name="attachment_preparing">正在准备文件…</string>
+    <string name="attachment_receiving">正在接收…</string>
+    <string name="attachment_failed">传输失败，请检查连接、文件大小和可用空间。</string>
+    <string name="attachment_canceled">已取消传输。</string>
+    <string name="attachment_choose">选择文件或图片</string>
+    <string name="attachment_cancel">取消</string>
+    <string name="attachment_retry">重试</string>
+    <string name="send_to_phone">发送到手机</string>
+    <string name="secure_fingerprint">Windows 证书指纹</string>
+    <string name="secure_invitation">配对邀请</string>
+    <string name="secure_pair">通过 HTTPS 配对</string>
+    <string name="secure_paired">已通过 HTTPS 配对</string>
+    <string name="secure_disconnect">断开连接</string>
+    <string name="secure_pair_failed">配对失败，请检查地址、证书指纹和邀请。</string>
 </resources>

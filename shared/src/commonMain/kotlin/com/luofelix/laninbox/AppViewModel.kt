@@ -39,6 +39,7 @@ internal class AppViewModel(initialDraft: String) : ViewModel() {
 
     // A lost acknowledgment can follow a successful save. Reuse the original ID on retry.
     private var pending: MessageRequest? = null
+    private var pendingAddress: String? = null
 
     fun select(destination: AppDestination) {
         mutableUiState.update { it.copy(destination = destination) }
@@ -64,24 +65,26 @@ internal class AppViewModel(initialDraft: String) : ViewModel() {
     }
 
     @OptIn(ExperimentalUuidApi::class)
-    fun send(senderId: String, sender: MessageSender) {
+    fun send(senderId: String, sender: MessageSender, pairedAddress: String? = null) {
         val state = uiState.value
         if (state.sending) return
-        val request = pending ?: MessageRequest(
+        val address = pairedAddress ?: state.address
+        val request = pending?.takeIf { pendingAddress == address } ?: MessageRequest(
             senderId = senderId,
             messageId = Uuid.random().toString(),
             kind = state.kind,
             content = state.draft,
         )
-        if (!request.isValid() || developmentEndpoint(state.address) == null) {
+        if (!request.isValid() || (pairedAddress == null && developmentEndpoint(address) == null)) {
             mutableUiState.update { it.copy(result = DeliveryResult.Rejected) }
             return
         }
         pending = request
+        pendingAddress = address
         mutableUiState.update { it.copy(sending = true, result = null) }
         viewModelScope.launch {
             try {
-                val result = sender.send(state.address, request)
+                val result = sender.send(address, request)
                 if (result == DeliveryResult.Delivered) pending = null
                 mutableUiState.update {
                     it.copy(

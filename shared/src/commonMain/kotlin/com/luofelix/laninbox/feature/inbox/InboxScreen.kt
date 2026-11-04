@@ -11,11 +11,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.luofelix.laninbox.core.network.MessageKind
+import com.luofelix.laninbox.core.network.AttachmentInfo
 import com.luofelix.laninbox.feature.send.label
 import laninbox.shared.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -26,12 +28,17 @@ internal fun InboxScreen(
     messages: List<InboxMessage>,
     status: ReceiverStatus,
     inboxActions: @Composable () -> Unit,
+    attachments: List<AttachmentInfo>,
+    previewAttachment: (suspend (AttachmentInfo) -> ImageBitmap?)?,
+    exportAttachment: ((AttachmentInfo) -> Unit)?,
 ) {
     val statusLabel = when (status) {
         ReceiverStatus.Disabled -> Res.string.receiver_disabled
         ReceiverStatus.Starting -> Res.string.receiver_starting
         ReceiverStatus.Listening -> Res.string.receiver_listening
         ReceiverStatus.IdentityListening -> Res.string.receiver_identity_listening
+        ReceiverStatus.SecureListening -> Res.string.receiver_secure_listening
+        ReceiverStatus.Foreground -> Res.string.receiver_foreground
         ReceiverStatus.Failed -> Res.string.receiver_failed
     }
     val clipboard = LocalClipboardManager.current
@@ -45,8 +52,11 @@ internal fun InboxScreen(
                 inboxActions()
             }
         }
-        if (messages.isEmpty()) item { Text(stringResource(Res.string.inbox_empty)) }
-        items(messages, key = { "${it.request.senderId}:${it.request.messageId}" }) { (message) ->
+        if (messages.isEmpty() && attachments.isEmpty()) item { Text(stringResource(Res.string.inbox_empty)) }
+        items(attachments, key = { "attachment:${it.id}" }) { attachment ->
+            AttachmentCard(attachment, previewAttachment, exportAttachment)
+        }
+        items(messages, key = { "message:${it.request.senderId}:${it.request.messageId}" }) { (message) ->
             Column {
                 Text(stringResource(message.kind.label()), style = MaterialTheme.typography.titleSmall)
                 Text(

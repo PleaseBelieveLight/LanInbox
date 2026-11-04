@@ -21,9 +21,14 @@ import java.sql.SQLException
 import kotlinx.io.readByteArray
 import kotlinx.serialization.SerializationException
 
-internal fun Application.messageRoutes(inbox: DesktopInbox, logger: AppLogger) {
+internal fun Application.messageRoutes(
+    inbox: DesktopInbox,
+    logger: AppLogger,
+    pairing: DesktopPairingSession? = null,
+) {
     routing {
         post(MESSAGE_ROUTE) {
+            if (pairing != null && call.requireSession(pairing) == null) return@post
             if (!call.request.contentType().match(ContentType.Application.Json)) {
                 call.respondText(
                     MessageJson.encodeToString(ProtocolError("unsupported_content_type")),
