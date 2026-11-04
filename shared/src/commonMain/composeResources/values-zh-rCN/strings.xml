@@ -42,6 +42,14 @@
     <string name="secure_invitation">配对邀请</string>
     <string name="secure_pair">通过 HTTPS 配对</string>
     <string name="secure_paired">已通过 HTTPS 配对</string>
-    <string name="secure_disconnect">断开连接</string>
+    <string name="secure_disconnect">忘记已配对设备</string>
+    <string name="discover_desktops">发现附近的电脑</string>
+    <string name="scan_pairing_qr">扫描配对二维码</string>
+    <string name="reconnect_desktop">重新连接已配对电脑</string>
+    <string name="device_name">设备显示名称</string>
+    <string name="save_device_name">保存设备名称</string>
     <string name="secure_pair_failed">配对失败，请检查地址、证书指纹和邀请。</string>
+    <string name="history_delete">删除</string>
+    <string name="history_clear">清空收件历史</string>
+    <string name="history_clear_confirmation">要删除应用中接收的消息和文件吗？</string>
 </resources>

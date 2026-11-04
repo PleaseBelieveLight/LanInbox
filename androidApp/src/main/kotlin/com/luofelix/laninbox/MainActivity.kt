@@ -5,7 +5,6 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,8 +17,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.luofelix.laninbox.core.logging.AppLogger
 import com.luofelix.laninbox.core.network.AttachmentInfo
+import com.luofelix.laninbox.core.network.PairingInvitation
 import com.luofelix.laninbox.feature.inbox.InboxMessage
 import com.luofelix.laninbox.feature.inbox.ReceiverStatus
 import com.luofelix.laninbox.feature.send.DeliveryResult
@@ -28,14 +27,20 @@ import com.luofelix.laninbox.feature.send.MessageSender
 import com.luofelix.laninbox.feature.send.SecurePairingForm
 import com.luofelix.laninbox.feature.send.TransferControls
 import com.luofelix.laninbox.feature.send.TransferStatus
-import java.util.UUID
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-    private val logger = AppLogger { event -> Log.i("LanInbox", event) }
+    private val discoveryEnabled = MutableStateFlow(false)
     private val localNetworkPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { }
+    ) { allowed ->
+        discoveryEnabled.value = allowed
+        transfers.networkPermissionChanged(allowed)
+    }
     private var developmentSender: DevelopmentMessageSender? = null
     private val transfers by viewModels<AndroidTransferViewModel>()
     private val chooseFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) {
@@ -44,12 +49,21 @@ class MainActivity : ComponentActivity() {
     private val saveFile = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) {
         transfers.completeExport(it)
     }
+    private val scanQr = registerForActivityResult(ScanContract()) { result ->
+        val contents = result.contents ?: return@registerForActivityResult
+        val invitation = PairingInvitation.decode(contents)
+        if (invitation == null) {
+            transfers.invalidInvitation()
+        } else if (canAccessLan()) {
+            transfers.pair(invitation.address, invitation.fingerprint, invitation.code)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) {
-            logger.info("Android activity started")
+            androidLogger.info("Android activity started")
         }
 
         // Match the debug manifest's cleartext policy when wiring the development sender.
@@ -68,7 +82,7 @@ class MainActivity : ComponentActivity() {
         } else {
             null
         }
-        val senderId = loadSenderId()
+        val senderId = AndroidSettings(applicationContext).senderId()
         val initialDraft = if (intent.action == Intent.ACTION_SEND &&
             intent.type == "text/plain"
         ) {
@@ -77,11 +91,20 @@ class MainActivity : ComponentActivity() {
             ""
         }
         lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.RESUMED) { transfers.receiveInForeground() }
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                launch { transfers.receiveInForeground() }
+                launch {
+                    discoveryEnabled.collectLatest { enabled ->
+                        if (enabled) discoverDesktops(this@MainActivity).collect(transfers::discoveryChanged)
+                    }
+                }
+            }
         }
         setContent {
             val connected by transfers.client.collectAsStateWithLifecycle()
             val pairing by transfers.pairing.collectAsStateWithLifecycle()
+            val devices by transfers.devices.collectAsStateWithLifecycle()
+            val remembered by transfers.remembered.collectAsStateWithLifecycle()
             val outgoing by transfers.outgoing.collectAsStateWithLifecycle()
             val incoming by transfers.incoming.collectAsStateWithLifecycle()
             val inbox by transfers.inbox.collectAsStateWithLifecycle()
@@ -96,6 +119,9 @@ class MainActivity : ComponentActivity() {
                 attachments = inbox.mapNotNull { it.attachment },
                 previewAttachment = transfers.files::preview,
                 exportAttachment = ::exportAttachment,
+                deleteMessage = { transfers.deleteHistory(it.request.messageId) },
+                deleteAttachment = { transfers.deleteHistory(it.id) },
+                clearHistory = { transfers.deleteHistory(null) },
                 sendActions = {
                     SecurePairingForm(
                         connected = connected != null,
@@ -106,6 +132,18 @@ class MainActivity : ComponentActivity() {
                             else transfers.permissionRequired()
                         },
                         onDisconnect = transfers::disconnect,
+                        devices = devices.map { it.name to it.address },
+                        remembered = remembered != null,
+                        onDiscover = { if (canAccessLan()) discoveryEnabled.value = true },
+                        onScan = {
+                            if (canAccessLan()) {
+                                scanQr.launch(ScanOptions()
+                                    .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                    .setPrompt(getString(R.string.pairing_scanner_prompt))
+                                    .setBeepEnabled(false))
+                            }
+                        },
+                        onReconnect = { if (canAccessLan()) transfers.reconnectSaved(it) },
                     )
                     if (pairing == TransferStatus.PermissionRequired) TransferControls(pairing)
                     if (connected != null) {
@@ -132,30 +170,30 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        val allowed = hasLanPermission()
+        discoveryEnabled.value = allowed
+        transfers.networkPermissionChanged(allowed)
+    }
+
     private fun exportAttachment(attachment: AttachmentInfo) {
         transfers.selectExport(attachment)
         saveFile.launch(attachment.name)
     }
 
     private fun canAccessLan(): Boolean {
-        if (Build.VERSION.SDK_INT < 37 || checkSelfPermission(LOCAL_NETWORK) == PackageManager.PERMISSION_GRANTED) {
-            return true
-        }
+        if (hasLanPermission()) return true
         localNetworkPermission.launch(LOCAL_NETWORK)
         return false
     }
 
+    private fun hasLanPermission(): Boolean =
+        Build.VERSION.SDK_INT < 37 || checkSelfPermission(LOCAL_NETWORK) == PackageManager.PERMISSION_GRANTED
+
     override fun onDestroy() {
         developmentSender?.close()
         super.onDestroy()
-    }
-
-    private fun loadSenderId(): String {
-        // Keep a stable sender ID for the receiver's deduplication key.
-        val settings = getSharedPreferences("laninbox_development", MODE_PRIVATE)
-        return settings.getString("sender_id", null) ?: UUID.randomUUID().toString().also {
-            settings.edit().putString("sender_id", it).apply()
-        }
     }
 
     private companion object {

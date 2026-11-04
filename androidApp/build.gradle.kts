@@ -21,10 +21,13 @@ dependencies {
     implementation(libs.ktor.client.core)
     implementation(libs.okhttp)
     implementation(libs.serialization.json)
+    implementation(libs.zxing.scanner)
+    implementation(libs.zxing.core)
     debugImplementation(libs.compose.uiTooling)
 }
 
 android {
+
     namespace = "com.luofelix.laninbox"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 

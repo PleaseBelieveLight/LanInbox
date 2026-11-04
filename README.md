@@ -8,8 +8,17 @@ LanInbox is a Kotlin Multiplatform app for sending text, links, code, files, and
 Android and Windows over a local network. Shared Compose UI and protocol code live in `shared`.
 The app entry points live in `androidApp` and `desktopApp`.
 
-For two-way transfers, follow the [HTTPS LAN setup](docs/desktop-tls.md#connect-android-over-the-lan).
-Android receives while the app is in the foreground.
+## Pair and transfer
+
+1. Launch LanInbox on Windows. It creates a local identity and starts the HTTPS receiver.
+2. Connect Android to the same network. Generate a pairing invitation on Windows and scan its
+   QR code from LanInbox on Android. The Windows address, fingerprint, and invitation can also
+   be entered manually.
+3. Send a message, file, or image. Keep LanInbox in the foreground on Android when receiving.
+   The inbox supports copying text, previewing images, saving files, and deleting history.
+
+The apps retain the pairing across restarts. Android rediscovers the pinned Windows identity
+after its address changes. See the [HTTPS setup and troubleshooting guide](docs/desktop-tls.md).
 
 ## Try text delivery
 
@@ -48,6 +57,9 @@ Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
 
 - Android tests: `./gradlew :shared:testAndroidHostTest`
 - Desktop tests: `./gradlew :shared:jvmTest :desktopApp:test`
+- Windows installer: `.\gradlew.bat :desktopApp:packageMsi` with JDK 21 and WiX 3.14.1
+
+See [release verification](docs/release-verification.md) for build and device checks.
 
 ---
 

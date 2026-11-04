@@ -3,19 +3,20 @@ package com.luofelix.laninbox
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import com.luofelix.laninbox.feature.inbox.PairingPanel
+import com.luofelix.laninbox.core.network.PairingInvitation
+import com.luofelix.laninbox.core.network.privateLanAuthority
+import com.luofelix.laninbox.core.network.SECURE_PORT
 import com.luofelix.laninbox.feature.send.DesktopTextSend
+import com.luofelix.laninbox.feature.send.DeviceNameEditor
 import com.luofelix.laninbox.feature.send.TransferControls
 import com.luofelix.laninbox.feature.send.TransferStatus
 import java.awt.FileDialog
@@ -23,35 +24,27 @@ import java.io.IOException
 import java.nio.file.Path
 import javax.imageio.ImageIO
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@Composable
-internal fun DesktopTransferActions(
-    window: ComposeWindow,
-    host: String,
-    fingerprint: String,
-    pairing: DesktopPairingSession,
-    outbox: DesktopOutbox,
+/** The window owns pending preparation even when the inbox header scrolls out of composition. */
+internal class DesktopTransferState(
+    private val scope: CoroutineScope,
+    private val pairing: DesktopPairingSession,
+    private val outbox: DesktopOutbox,
 ) {
-    val scope = rememberCoroutineScope()
-    val session by pairing.activeSession.collectAsState()
-    val invitation by pairing.invitation.collectAsState()
-    val queued by outbox.delivery.collectAsState()
-    val delivered by outbox.delivered.collectAsState()
-    var staging by remember { mutableStateOf<Job?>(null) }
-    var lastSource by remember { mutableStateOf<Path?>(null) }
-    var preparation by remember { mutableStateOf<TransferStatus?>(null) }
-    LaunchedEffect(session, queued?.owner) {
-        if (queued?.owner != null && queued?.owner != session) outbox.cancel()
-    }
-    DisposableEffect(outbox) { onDispose { outbox.cancel() } }
+    private var staging: Job? = null
+    var lastSource by mutableStateOf<Path?>(null)
+        private set
+    var preparation by mutableStateOf<TransferStatus?>(null)
+        private set
 
     fun prepare(path: Path) {
-        val owner = session ?: return
-        if (staging?.isActive == true || queued != null) return
+        val owner = pairing.activeSession.value ?: return
+        if (staging?.isActive == true || outbox.delivery.value != null) return
         lastSource = path
         preparation = TransferStatus.Preparing
         staging = scope.launch {
@@ -66,22 +59,65 @@ internal fun DesktopTransferActions(
         }
     }
 
-    SelectionContainer { Text("$host:8443") }
-    SelectionContainer { Text(fingerprint) }
-    PairingPanel(invitation, pairing::issueInvitation) {
+    fun cancel() {
         staging?.cancel()
         outbox.cancel()
-        pairing.revoke()
+        preparation = TransferStatus.Canceled
     }
+
+    fun revoke() {
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) { pairing.revoke() }
+                cancel()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                preparation = TransferStatus.Failed
+            }
+        }
+    }
+
+    fun sendText(text: String, kind: com.luofelix.laninbox.core.network.MessageKind): Boolean {
+        val owner = pairing.activeSession.value ?: return false
+        preparation = null
+        return outbox.enqueueText(owner, text, kind)
+    }
+}
+
+@Composable
+internal fun DesktopTransferActions(
+    window: ComposeWindow,
+    host: String?,
+    fingerprint: String,
+    pairing: DesktopPairingSession,
+    outbox: DesktopOutbox,
+    state: DesktopTransferState,
+    deviceName: String,
+    onDeviceName: (String) -> Unit,
+) {
+    val session by pairing.activeSession.collectAsState()
+    val invitation by pairing.invitation.collectAsState()
+    val queued by outbox.delivery.collectAsState()
+    val delivered by outbox.delivered.collectAsState()
+    val preparation = state.preparation
+    val lastSource = state.lastSource
+    val address = host?.let { "$it:$SECURE_PORT" }
+    DeviceNameEditor(deviceName, onDeviceName)
+    address?.let { SelectionContainer { Text(it) } }
+    SelectionContainer { Text(fingerprint) }
+    val code = invitation
+    val qr = remember(code, address, fingerprint) {
+        if (code != null && address != null && privateLanAuthority(address, SECURE_PORT) != null) {
+            pairingQr(PairingInvitation(address, fingerprint, code))
+        } else null
+    }
+    PairingPanel(invitation, qr, pairing::issueInvitation, state::revoke)
     val active = queued
     val attachment = active?.delivery?.attachment
     val idle = active == null && preparation != TransferStatus.Preparing
     val ready = session != null && idle
-    DesktopTextSend(ready) { text, kind ->
-        val owner = session ?: return@DesktopTextSend false
-        preparation = null
-        outbox.enqueueText(owner, text, kind)
-    }
+    DesktopTextSend(ready, state::sendText)
     val status = when {
         active != null -> TransferStatus.Sending
         preparation != null -> preparation
@@ -94,14 +130,10 @@ internal fun DesktopTransferActions(
             if (it.size == 0L) 1f else (active.transferred.toDouble() / it.size).toFloat().coerceIn(0f, 1f)
         },
         name = attachment?.name ?: lastSource?.fileName?.toString()?.takeIf { preparation != null },
-        choose = if (ready) ({ chooseDesktopPath(window, FileDialog.LOAD)?.let(::prepare) }) else null,
-        cancel = if (!idle) ({
-            staging?.cancel()
-            outbox.cancel()
-            preparation = TransferStatus.Canceled
-        }) else null,
+        choose = if (ready) ({ chooseDesktopPath(window, FileDialog.LOAD)?.let(state::prepare) }) else null,
+        cancel = if (!idle) state::cancel else null,
         retry = if (ready && (preparation == TransferStatus.Canceled || preparation == TransferStatus.Failed))
-            ({ lastSource?.let(::prepare) }) else null,
+            ({ lastSource?.let(state::prepare) }) else null,
     )
 }
 

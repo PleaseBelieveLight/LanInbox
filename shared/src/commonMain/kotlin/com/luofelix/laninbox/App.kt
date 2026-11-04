@@ -45,6 +45,9 @@ fun App(
     exportAttachment: ((AttachmentInfo) -> Unit)? = null,
     sendActions: @Composable () -> Unit = {},
     pairedAddress: String? = null,
+    deleteMessage: ((InboxMessage) -> Unit)? = null,
+    deleteAttachment: ((AttachmentInfo) -> Unit)? = null,
+    clearHistory: (() -> Unit)? = null,
 ) {
     val model = viewModel { AppViewModel(initialDraft) }
     val state by model.uiState.collectAsStateWithLifecycle()
@@ -67,7 +70,10 @@ fun App(
                     }
                 }
                 if (inboxOnly || state.destination == AppDestination.Inbox) {
-                    InboxScreen(messages, receiverStatus, inboxActions, attachments, previewAttachment, exportAttachment)
+                    InboxScreen(
+                        messages, receiverStatus, inboxActions, attachments, previewAttachment, exportAttachment,
+                        deleteMessage, deleteAttachment, clearHistory,
+                    )
                 } else {
                     Column(
                         modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),

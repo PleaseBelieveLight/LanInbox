@@ -5,12 +5,15 @@ import com.luofelix.laninbox.core.network.MAX_ATTACHMENT_BYTES
 import io.ktor.utils.io.ByteChannel
 import io.ktor.utils.io.ByteReadChannel
 import java.nio.file.Files
+import java.io.FilterOutputStream
+import java.io.IOException
 import java.security.MessageDigest
 import java.util.HexFormat
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -39,6 +42,34 @@ class DesktopAttachmentStoreTest {
             assertEquals(AttachmentResult.Replay, reopened.save(first, ByteReadChannel(bytes)))
             assertContentEquals(bytes, Files.readAllBytes(root.resolve(first.id).resolve("payload")))
             assertEquals(1L, Files.list(root).use { it.count() })
+            reopened.delete(first)
+            assertEquals(AttachmentResult.Replay, reopened.save(first, ByteReadChannel(bytes)))
+            assertFalse(Files.exists(reopened.payload(first)))
+        } finally {
+            root.toFile().deleteRecursively()
+        }
+        Unit
+    }
+
+    @Test
+    fun diskWriteFailureRemovesPartialFileAndReleasesUploadSlot() = runBlocking {
+        val root = Files.createTempDirectory("laninbox-failed-attachment")
+        try {
+            var fail = true
+            val store = DesktopAttachmentStore(root) { file ->
+                val output = Files.newOutputStream(file)
+                if (!fail) output else object : FilterOutputStream(output) {
+                    override fun write(bytes: ByteArray, offset: Int, length: Int) {
+                        out.write(bytes[offset].toInt())
+                        throw IOException("Simulated disk full")
+                    }
+                }
+            }
+            val bytes = byteArrayOf(1, 2, 3)
+            assertFailsWith<IOException> { store.save(request(bytes), ByteReadChannel(bytes)) }
+            assertEquals(0L, Files.list(root).use { it.count() })
+            fail = false
+            assertEquals(AttachmentResult.Created, store.save(request(bytes), ByteReadChannel(bytes)))
         } finally {
             root.toFile().deleteRecursively()
         }

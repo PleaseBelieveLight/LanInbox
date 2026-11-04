@@ -5,10 +5,13 @@ import com.luofelix.laninbox.core.network.MAX_ATTACHMENT_BYTES
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readAvailable
 import java.io.IOException
+import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.security.MessageDigest
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.HexFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -25,7 +28,10 @@ internal enum class AttachmentResult {
 }
 
 /** Stores verified payloads under their transfer IDs and publishes each payload with its receipt. */
-internal class DesktopAttachmentStore(private val root: Path) {
+internal class DesktopAttachmentStore(
+    private val root: Path,
+    private val openStagingOutput: (Path) -> OutputStream = { Files.newOutputStream(it) },
+) {
     private val uploads = Semaphore(2)
     private val publication = Mutex()
     private val history = MutableStateFlow<List<AttachmentInfo>>(emptyList())
@@ -38,13 +44,38 @@ internal class DesktopAttachmentStore(private val root: Path) {
 
     suspend fun initialize() = withContext(Dispatchers.IO) {
         if (Files.isDirectory(root)) {
+            val staleBefore = Instant.now().minus(1, ChronoUnit.DAYS)
             history.value = Files.list(root).use { entries ->
-                entries.filter { Files.isDirectory(it) && !it.fileName.toString().startsWith(".") }
+                entries.filter { Files.isDirectory(it) }.filter {
+                    if (it.fileName.toString().startsWith(".upload-")) {
+                        if (Files.getLastModifiedTime(it).toInstant().isBefore(staleBefore)) {
+                            cleanupStaging(it, it.resolve("payload"), it.resolve("receipt"))
+                        }
+                        false
+                    } else Files.isRegularFile(it.resolve("payload"))
+                }
                     .sorted(compareByDescending { Files.getLastModifiedTime(it) })
                     .limit(100)
                     .map(::readReceipt)
                     .toList()
                     .filterNotNull()
+            }
+        }
+    }
+
+    /** Removes stored payloads while keeping the size and digest needed to acknowledge retries. */
+    suspend fun delete(attachment: AttachmentInfo?) = withContext(Dispatchers.IO) {
+        publication.withLock {
+            val candidates = when {
+                !Files.isDirectory(root) -> emptyList()
+                attachment == null -> Files.list(root).use { entries ->
+                    entries.map(::readReceipt).toList().filterNotNull()
+                }
+                else -> listOf(attachment)
+            }
+            for (item in candidates) {
+                Files.deleteIfExists(payload(item))
+                history.value = history.value.filterNot { it.id == item.id }
             }
         }
     }
@@ -75,7 +106,7 @@ internal class DesktopAttachmentStore(private val root: Path) {
             val digest = MessageDigest.getInstance("SHA-256")
             val buffer = ByteArray(64 * 1024)
             var received = 0L
-            Files.newOutputStream(payload).use { output ->
+            openStagingOutput(payload).use { output ->
                 while (true) {
                     val count = body.readAvailable(buffer)
                     if (count == -1) break
@@ -124,7 +155,7 @@ internal class DesktopAttachmentStore(private val root: Path) {
             name = lines.getOrNull(2) ?: "attachment",
             mediaType = lines.getOrNull(3) ?: "application/octet-stream",
         )
-        return attachment.takeIf { it.isValid() && Files.isRegularFile(payload(it)) }
+        return attachment.takeIf { it.isValid() }
     }
 
     private fun cleanupStaging(staging: Path, payload: Path, receipt: Path) {

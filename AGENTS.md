@@ -6,8 +6,8 @@ LanInbox is a Kotlin Multiplatform app with shared Compose UI for Android and de
 
 - `shared/src/commonMain/kotlin` contains shared UI and logic. Keep reusable UI assets in
   `shared/src/commonMain/composeResources`.
-- `shared/src/androidMain` and `shared/src/jvmMain` contain platform implementations. Follow the
-  existing `Platform.android.kt` and `Platform.jvm.kt` pattern for platform-specific counterparts.
+- `shared/src/jvmAndAndroidMain/kotlin` contains the HTTPS client compiled into both JVM targets.
+  Platform adapters for discovery, credential storage, and file selection live in the app modules.
 - `androidApp` owns `MainActivity.kt`, the Android manifest, and `src/main/res`. `desktopApp` owns
   the desktop entry point in `main.kt` and installer configuration. Keep any embedded LAN receiver
   tied to the desktop app lifecycle.
@@ -22,7 +22,8 @@ root. On macOS or Linux, replace `./gradlew.bat` with `./gradlew`.
 | `./gradlew.bat :androidApp:assembleDebug`                   | Build the Android debug APK.                 |
 | `./gradlew.bat :desktopApp:run`                             | Launch the desktop app.                      |
 | `./gradlew.bat :desktopApp:hotRun --auto`                   | Launch desktop with Compose Hot Reload.      |
-| `./gradlew.bat :shared:testAndroidHostTest :shared:jvmTest` | Run Android host and desktop JVM unit tests. |
+| `./gradlew.bat :shared:testAndroidHostTest :shared:jvmTest :desktopApp:test` | Run shared and desktop integration tests. |
+| `./gradlew.bat :desktopApp:packageMsi` | Build the Windows installer with JDK 21 and WiX 3.14.1. |
 
 Check available RAM before builds or other memory-intensive tasks. If memory is tight, stop
 completed background processes you started. If headroom remains insufficient, skip the task and

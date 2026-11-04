@@ -63,6 +63,9 @@ class MessageRoutesTest {
                 val reopened = DesktopInbox(file)
                 reopened.initialize()
                 assertEquals(listOf(message), reopened.messages.value.map { it.request })
+                reopened.delete(message)
+                assertEquals(HttpStatusCode.OK, submit(encoded).status)
+                assertEquals(emptyList(), inbox.messages.value)
             }
         } finally {
             Files.deleteIfExists(file)

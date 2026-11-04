@@ -21,6 +21,8 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okio.ByteString.Companion.toByteString
 
@@ -29,6 +31,7 @@ internal data class StagedUpload(val info: AttachmentInfo, val file: File)
 internal class AndroidTransferFiles(private val application: Application) {
     private val inbox = File(application.filesDir, "secure-inbox")
     private val resolver = application.contentResolver
+    private val historyLock = Mutex()
 
     suspend fun stage(uri: Uri): StagedUpload = withContext(Dispatchers.IO) {
         if (uri.scheme != "content" && uri.scheme != "file") throw IOException("Unsupported local URI")
@@ -70,18 +73,26 @@ internal class AndroidTransferFiles(private val application: Application) {
     suspend fun recent(): List<OutboundDelivery> = withContext(Dispatchers.IO) {
         inbox.listFiles().orEmpty()
             .filter { it.extension == "json" }
+            .filter { !File(inbox, "${it.nameWithoutExtension}.deleted").exists() }
             .sortedByDescending { it.lastModified() }
+            .asSequence()
             .mapNotNull(::readRecord)
             .take(100)
+            .toList()
     }
 
     suspend fun receive(client: SecureLanClient, delivery: OutboundDelivery, progress: (Long) -> Unit) =
-        withContext(Dispatchers.IO) {
+        withContext(Dispatchers.IO) { historyLock.withLock {
             require(delivery.isValid())
             if (!inbox.isDirectory && !inbox.mkdirs()) throw IOException("Could not create inbox")
             val record = File(inbox, "${delivery.id}.json")
+            val tombstone = File(inbox, "${delivery.id}.deleted")
+            if (tombstone.isFile) {
+                if (tombstone.readText() == deliveryDigest(delivery)) return@withLock
+                throw IOException("Delivery ID conflict")
+            }
             val saved = readRecord(record)
-            if (saved == delivery) return@withContext
+            if (saved == delivery) return@withLock
             if (saved != null) throw IOException("Delivery ID conflict")
             val attachment = delivery.attachment
             if (attachment != null) {
@@ -105,7 +116,40 @@ internal class AndroidTransferFiles(private val application: Application) {
                 atomic.failWrite(stream)
                 throw error
             }
+            if (readRecord(record) != delivery) throw IOException("Could not commit inbox receipt")
+        } }
+
+    /** Retains only the retry digest after deleting the original content. */
+    suspend fun delete(id: String?) = withContext(Dispatchers.IO) {
+        historyLock.withLock {
+            val entries = inbox.listFiles().orEmpty().filter {
+                it.extension == "json" && (id == null || it.nameWithoutExtension == id)
+            }
+            for (file in entries) {
+                val delivery = readRecord(file) ?: continue
+                val tombstone = AtomicFile(File(inbox, "${delivery.id}.deleted"))
+                val stream = tombstone.startWrite()
+                try {
+                    stream.write(deliveryDigest(delivery).encodeToByteArray())
+                    tombstone.finishWrite(stream)
+                } catch (error: IOException) {
+                    tombstone.failWrite(stream)
+                    throw error
+                }
+                if (tombstone.readFully().decodeToString() != deliveryDigest(delivery)) {
+                    throw IOException("Could not commit deleted delivery receipt")
+                }
+                delivery.attachment?.let {
+                    val stored = payload(it)
+                    if (!stored.delete() && stored.exists()) throw IOException("Could not delete attachment")
+                }
+                if (!file.delete() && file.exists()) throw IOException("Could not delete history record")
+            }
         }
+    }
+
+    private fun deliveryDigest(delivery: OutboundDelivery): String = MessageDigest.getInstance("SHA-256")
+        .digest(MessageJson.encodeToString(delivery).encodeToByteArray()).toByteString().hex()
 
     suspend fun preview(attachment: AttachmentInfo): ImageBitmap? = withContext(Dispatchers.IO) {
         val file = payload(attachment).path

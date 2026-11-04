@@ -9,6 +9,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -85,6 +86,11 @@ fun SecurePairingForm(
     failed: Boolean,
     onPair: (address: String, fingerprint: String, invitation: String) -> Unit,
     onDisconnect: () -> Unit,
+    devices: List<Pair<String, String>> = emptyList(),
+    remembered: Boolean = false,
+    onDiscover: (() -> Unit)? = null,
+    onScan: (() -> Unit)? = null,
+    onReconnect: ((String) -> Unit)? = null,
 ) {
     var address by remember { mutableStateOf("") }
     var fingerprint by remember { mutableStateOf("") }
@@ -93,6 +99,17 @@ fun SecurePairingForm(
         Text(stringResource(Res.string.secure_paired))
         OutlinedButton(onClick = onDisconnect) { Text(stringResource(Res.string.secure_disconnect)) }
     } else {
+        onDiscover?.let {
+            OutlinedButton(onClick = it) { Text(stringResource(Res.string.discover_desktops)) }
+        }
+        devices.forEach { (name, endpoint) ->
+            TextButton(enabled = !busy, onClick = { address = endpoint }) {
+                Text("$name · $endpoint")
+            }
+        }
+        onScan?.let {
+            OutlinedButton(enabled = !busy, onClick = it) { Text(stringResource(Res.string.scan_pairing_qr)) }
+        }
         OutlinedTextField(address, { address = it }, label = { Text(stringResource(Res.string.receiver_address)) },
             enabled = !busy, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(fingerprint, { fingerprint = it }, label = { Text(stringResource(Res.string.secure_fingerprint)) },
@@ -104,6 +121,23 @@ fun SecurePairingForm(
             enabled = !busy && address.isNotBlank() && fingerprint.isNotBlank() && invitation.isNotBlank(),
             onClick = { onPair(address, fingerprint, invitation) },
         ) { Text(stringResource(Res.string.secure_pair)) }
+        if (remembered && onReconnect != null) {
+            OutlinedButton(enabled = !busy, onClick = { onReconnect(address) }) {
+                Text(stringResource(Res.string.reconnect_desktop))
+            }
+        }
         if (failed) Text(stringResource(Res.string.secure_pair_failed))
+    }
+}
+
+@Composable
+fun DeviceNameEditor(name: String, onSave: (String) -> Unit) {
+    var draft by remember(name) { mutableStateOf(name) }
+    OutlinedTextField(
+        draft, { draft = it.take(40) }, label = { Text(stringResource(Res.string.device_name)) },
+        singleLine = true, modifier = Modifier.fillMaxWidth(),
+    )
+    if (draft.trim() != name && draft.isNotBlank()) {
+        OutlinedButton(onClick = { onSave(draft.trim()) }) { Text(stringResource(Res.string.save_device_name)) }
     }
 }

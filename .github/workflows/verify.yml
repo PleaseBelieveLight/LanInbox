@@ -1,0 +1,52 @@
+name: Verify LanInbox
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0'
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Set up WiX for JDK 21
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'wix314-binaries.zip'
+          $wix = Join-Path $env:RUNNER_TEMP 'wix314'
+          Invoke-WebRequest -Uri 'https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip' -OutFile $archive
+          Expand-Archive -LiteralPath $archive -DestinationPath $wix
+          $wix | Out-File -FilePath $env:GITHUB_PATH -Append
+          "WIX_PATH=$wix" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Build, test, and package
+        run: >
+          .\gradlew.bat --no-daemon --no-configuration-cache -Pandroid.builder.sdkDownload=false
+          :androidApp:assembleDebug :shared:testAndroidHostTest :shared:jvmTest
+          :desktopApp:test :desktopApp:packageMsi
+      - name: Upload builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: laninbox-verification-builds
+          if-no-files-found: error
+          path: |
+            androidApp/build/outputs/apk/debug/*.apk
+            desktopApp/build/compose/binaries/main/msi/*.msi
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: laninbox-test-reports
+          path: '**/build/reports/tests/**'

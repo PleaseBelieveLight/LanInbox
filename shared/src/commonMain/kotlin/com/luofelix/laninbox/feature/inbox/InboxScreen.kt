@@ -7,9 +7,15 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -31,6 +37,9 @@ internal fun InboxScreen(
     attachments: List<AttachmentInfo>,
     previewAttachment: (suspend (AttachmentInfo) -> ImageBitmap?)?,
     exportAttachment: ((AttachmentInfo) -> Unit)?,
+    deleteMessage: ((InboxMessage) -> Unit)?,
+    deleteAttachment: ((AttachmentInfo) -> Unit)?,
+    clearHistory: (() -> Unit)?,
 ) {
     val statusLabel = when (status) {
         ReceiverStatus.Disabled -> Res.string.receiver_disabled
@@ -42,6 +51,22 @@ internal fun InboxScreen(
         ReceiverStatus.Failed -> Res.string.receiver_failed
     }
     val clipboard = LocalClipboardManager.current
+    var confirmingClear by remember { mutableStateOf(false) }
+    if (confirmingClear && clearHistory != null) {
+        AlertDialog(
+            onDismissRequest = { confirmingClear = false },
+            title = { Text(stringResource(Res.string.history_clear)) },
+            text = { Text(stringResource(Res.string.history_clear_confirmation)) },
+            confirmButton = {
+                TextButton(onClick = { confirmingClear = false; clearHistory() }) {
+                    Text(stringResource(Res.string.history_clear))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingClear = false }) { Text(stringResource(Res.string.attachment_cancel)) }
+            },
+        )
+    }
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -52,9 +77,14 @@ internal fun InboxScreen(
                 inboxActions()
             }
         }
+        if (clearHistory != null && (messages.isNotEmpty() || attachments.isNotEmpty())) {
+            item {
+                OutlinedButton(onClick = { confirmingClear = true }) { Text(stringResource(Res.string.history_clear)) }
+            }
+        }
         if (messages.isEmpty() && attachments.isEmpty()) item { Text(stringResource(Res.string.inbox_empty)) }
         items(attachments, key = { "attachment:${it.id}" }) { attachment ->
-            AttachmentCard(attachment, previewAttachment, exportAttachment)
+            AttachmentCard(attachment, previewAttachment, exportAttachment, deleteAttachment)
         }
         items(messages, key = { "message:${it.request.senderId}:${it.request.messageId}" }) { (message) ->
             Column {
@@ -67,6 +97,11 @@ internal fun InboxScreen(
                 )
                 OutlinedButton(onClick = { clipboard.setText(AnnotatedString(message.content)) }) {
                     Text(stringResource(Res.string.copy_message))
+                }
+                deleteMessage?.let { delete ->
+                    TextButton(onClick = { delete(InboxMessage(message)) }) {
+                        Text(stringResource(Res.string.history_delete))
+                    }
                 }
             }
         }

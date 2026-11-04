@@ -76,7 +76,7 @@ internal fun Application.messageRoutes(
                 false -> HttpStatusCode.Conflict to MessageJson.encodeToString(ProtocolError("message_id_conflict"))
                 null -> HttpStatusCode.InternalServerError to MessageJson.encodeToString(ProtocolError("storage_failure"))
             }
-            logger.info("Message request handled status=${status.value}")
+            logger.info("Message request handled", "status" to status.value)
             call.respondText(body, ContentType.Application.Json, status)
         }
     }

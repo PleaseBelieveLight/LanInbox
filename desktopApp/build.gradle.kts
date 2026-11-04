@@ -17,9 +17,12 @@ dependencies {
     implementation(libs.ktor.server.netty)
     implementation(libs.serialization.json)
     implementation(libs.sqlite.jdbc)
+    implementation(libs.ktor.tls.certificates)
+    implementation(libs.jmdns)
+    implementation(libs.zxing.core)
+    implementation(libs.jna.platform)
     testImplementation(libs.kotlin.testJunit)
     testImplementation(libs.ktor.server.test)
-    testImplementation(libs.ktor.tls.certificates)
 }
 
 compose.desktop {
@@ -28,7 +31,8 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "com.luofelix.laninbox"
+            modules("java.naming", "java.prefs", "java.sql", "jdk.crypto.ec", "jdk.unsupported")
+            packageName = "LanInbox"
             packageVersion = "1.0.0"
         }
     }

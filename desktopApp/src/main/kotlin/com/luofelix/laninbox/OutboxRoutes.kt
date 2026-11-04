@@ -12,8 +12,10 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import kotlinx.coroutines.sync.Semaphore
 
 internal fun Route.outboxRoutes(pairing: DesktopPairingSession, outbox: DesktopOutbox) {
+    val downloads = Semaphore(1)
     get("/v1/outbox") {
         val session = call.requireSession(pairing) ?: return@get
         val delivery = outbox.next(session)?.delivery
@@ -29,8 +31,16 @@ internal fun Route.outboxRoutes(pairing: DesktopPairingSession, outbox: DesktopO
         }
         val size = checkNotNull(entry.delivery.attachment).size
         val authorization = call.request.headers[HttpHeaders.Authorization]
-        call.respondOutputStream(ContentType.Application.OctetStream, contentLength = size) {
-            outbox.writeFile(entry, this) { pairing.authorizedSession(authorization) == session }
+        if (!downloads.tryAcquire()) {
+            call.respond(HttpStatusCode.ServiceUnavailable)
+            return@get
+        }
+        try {
+            call.respondOutputStream(ContentType.Application.OctetStream, contentLength = size) {
+                outbox.writeFile(entry, this) { pairing.authorizedSession(authorization) == session }
+            }
+        } finally {
+            downloads.release()
         }
     }
     post("/v1/outbox/{id}/ack") {

@@ -3,31 +3,30 @@ package com.luofelix.laninbox
 import com.luofelix.laninbox.core.logging.AppLogger
 import com.luofelix.laninbox.core.network.privateLanAuthority
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCallPipeline
+import io.ktor.server.application.call
 import io.ktor.server.engine.applicationEnvironment
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.engine.sslConnector
 import io.ktor.server.netty.Netty
 import io.ktor.server.response.respondText
+import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
-import java.nio.file.Files
-import java.nio.file.Path
-import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.PrivateKey
 import java.security.cert.X509Certificate
 import java.util.Base64
 
-private const val KEY_ALIAS = "laninbox"
+internal const val DESKTOP_KEY_ALIAS = "laninbox"
 private const val IDENTITY_PORT = 8443
 
 /**
- * Loads an operator-provisioned identity and exposes the loopback HTTPS development routes.
- * Keep the connector on loopback while the Android trust flow is under development.
+ * Serves the pinned desktop identity and authenticated transfer routes over HTTPS.
  */
 internal fun desktopIdentityServer(
-    keyStorePath: Path,
-    password: String,
+    identity: DesktopTlsIdentity,
     attachments: DesktopAttachmentStore,
     port: Int = IDENTITY_PORT,
     pairing: DesktopPairingSession = DesktopPairingSession(),
@@ -37,14 +36,14 @@ internal fun desktopIdentityServer(
     logger: AppLogger = AppLogger { },
     onFingerprint: (String) -> Unit = {},
 ) = run {
-    require(bindAddress == "127.0.0.1" ||
+    require(bindAddress == "127.0.0.1" || bindAddress == "0.0.0.0" ||
         privateLanAuthority(bindAddress, IDENTITY_PORT) == "$bindAddress:$IDENTITY_PORT")
-    val keyStore = KeyStore.getInstance("PKCS12")
-    Files.newInputStream(keyStorePath).use { keyStore.load(it, password.toCharArray()) }
-    require(keyStore.getKey(KEY_ALIAS, password.toCharArray()) is PrivateKey) {
+    val keyStore = identity.keyStore
+    val password = identity.password
+    require(keyStore.getKey(DESKTOP_KEY_ALIAS, password.toCharArray()) is PrivateKey) {
         "The LanInbox identity must contain a private key"
     }
-    val certificate = keyStore.getCertificate(KEY_ALIAS) as? X509Certificate
+    val certificate = keyStore.getCertificate(DESKTOP_KEY_ALIAS) as? X509Certificate
         ?: error("The LanInbox identity must contain an X.509 certificate")
     certificate.checkValidity()
     val digest = MessageDigest.getInstance("SHA-256").digest(certificate.publicKey.encoded)
@@ -55,7 +54,7 @@ internal fun desktopIdentityServer(
         requestReadTimeoutSeconds = 10
         sslConnector(
             keyStore = keyStore,
-            keyAlias = KEY_ALIAS,
+            keyAlias = DESKTOP_KEY_ALIAS,
             keyStorePassword = { password.toCharArray() },
             privateKeyPassword = { password.toCharArray() },
         ) {
@@ -63,6 +62,13 @@ internal fun desktopIdentityServer(
             this.port = port
         }
     }) {
+        intercept(ApplicationCallPipeline.Plugins) {
+            val peer = call.request.local.remoteAddress
+            if (peer != "127.0.0.1" && privateLanAuthority(peer, IDENTITY_PORT) == null) {
+                call.respond(HttpStatusCode.Forbidden)
+                finish()
+            }
+        }
         if (inbox != null) messageRoutes(inbox, logger, pairing)
         routing {
             pairingRoutes(pairing)

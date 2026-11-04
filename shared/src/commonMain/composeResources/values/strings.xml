@@ -42,6 +42,14 @@
     <string name="secure_invitation">Pairing invitation</string>
     <string name="secure_pair">Pair over HTTPS</string>
     <string name="secure_paired">Paired over HTTPS</string>
-    <string name="secure_disconnect">Disconnect</string>
+    <string name="secure_disconnect">Forget paired device</string>
+    <string name="discover_desktops">Discover nearby computers</string>
+    <string name="scan_pairing_qr">Scan pairing QR code</string>
+    <string name="reconnect_desktop">Reconnect to paired computer</string>
+    <string name="device_name">Device display name</string>
+    <string name="save_device_name">Save device name</string>
     <string name="secure_pair_failed">Pairing failed. Check the address, certificate fingerprint, and invitation.</string>
+    <string name="history_delete">Delete</string>
+    <string name="history_clear">Clear inbox history</string>
+    <string name="history_clear_confirmation">Delete received messages and files from this app?</string>
 </resources>

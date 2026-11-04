@@ -56,6 +56,10 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
+        jvmTest.dependencies {
+            implementation(libs.ktor.client.mock)
+            implementation(libs.coroutines.test)
+        }
         getByName("androidDeviceTest").dependencies {
             implementation(libs.androidx.testRunner)
         }

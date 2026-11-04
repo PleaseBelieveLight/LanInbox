@@ -9,12 +9,13 @@ LanInbox 是一款 Kotlin Multiplatform 工具，可以在 Android 和 Windows �
 
 ## 双向 HTTPS 快传
 
-1. 按[桌面 TLS 配置](docs/desktop-tls.md#connect-android-over-the-lan)生成包含 Windows 局域网 IPv4 地址的
-   证书，并设置 `LANINBOX_TLS_BIND` 启动桌面端。
-2. 在 Windows 生成配对邀请。把桌面窗口显示的地址、证书公钥指纹和邀请填入 Android 发送页。系统要求局域网
-   权限时，授权后重试。
+1. 启动 Windows 版局域网快传。应用会创建本机身份并启动 HTTPS 接收端。
+2. 让 Android 和电脑连入同一局域网。在 Windows 生成配对邀请，在 Android 扫描二维码。也可以手动输入
+   Windows 地址、公钥指纹和邀请。系统要求局域网权限时，授权后重试。
 3. 两端都可以发送文字或选择文件、图片。Windows 向手机发送时，保持 Android 应用在前台。
-4. 在收件箱预览支持的图片，或用**另存为**导出文件。传输中断后重试会从文件开头重新传输。
+4. 在收件箱复制文字、预览图片、另存文件或清理历史。传输中断后重试会从文件开头重新传输。
+
+配对在两端重启后保留。电脑换 IP 后，Android 会通过局域网发现重新定位原设备。具体见[连接与故障排查](docs/desktop-tls.md)。
 
 ## 联调文本快传
 
@@ -39,3 +40,5 @@ LanInbox 是一款 Kotlin Multiplatform 工具，可以在 Android 和 Windows �
 - 桌面应用使用 `.\gradlew.bat :desktopApp:run` 启动，也可运行
   `.\gradlew.bat :desktopApp:hotRun --auto` 使用 Compose 热重载。
 - 使用 `.\gradlew.bat :shared:testAndroidHostTest :shared:jvmTest :desktopApp:test` 运行主机单测和桌面接收端测试。
+- 安装 JDK 21 和 WiX 3.14.1 后，使用 `.\gradlew.bat :desktopApp:packageMsi` 构建 Windows 安装包。
+  见[发布验收清单](docs/release-verification.md)。

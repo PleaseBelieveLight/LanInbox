@@ -1,13 +1,19 @@
-# Desktop TLS Identity Probe
+# Desktop HTTPS Pairing
 
-The desktop HTTPS receiver defaults to `127.0.0.1:8443`. `GET /v1/identity` returns
+On Windows, the app starts the HTTPS receiver on port `8443` and advertises
+`_laninbox._tcp.local.` on private IPv4 interfaces. Windows DPAPI protects the certificate key
+and the saved pairing verifier. Android Keystore protects its paired device record.
+
+`GET /v1/identity` returns
 `sha256/<base64>`, where the digest is SHA-256 over the leaf certificate's DER-encoded
-SubjectPublicKeyInfo. Copy the fingerprint directly from the desktop app for pairing. Android
-checks both the pinned public key and the address in the certificate during the TLS handshake.
+SubjectPublicKeyInfo. Android uses the desktop public key from the QR code or manually entered
+fingerprint as its trust anchor during the handshake. Discovery only supplies a candidate
+address. A device advertising a copied fingerprint still needs the corresponding private key.
 
 ## Run the probe
 
-Generate a local PKCS#12 keystore. Keep the keystore and its password outside version control.
+To run an isolated loopback probe, generate a local PKCS#12 keystore. Keep the keystore and
+its password outside version control.
 
 ```powershell
 $identity = Join-Path $env:LOCALAPPDATA 'LanInbox/identity.p12'
@@ -41,19 +47,20 @@ authenticated text and attachment transfers in both directions.
 
 ## Connect Android over the LAN
 
-1. Generate a separate keystore using the steps above. Replace the certificate's SAN argument
-   with `'SAN=IP:127.0.0.1,IP:192.168.1.25'`, using the actual private IPv4 address of the PC.
-2. Set `$env:LANINBOX_TLS_BIND = '192.168.1.25'` before running the desktop app with that
-   keystore. Allow TCP 8443 on the Windows private network profile if needed.
-3. Select **Create pairing invitation** on Windows. Enter the address, fingerprint, and
-   invitation shown on the PC into Android. Grant local network access if prompted, then retry.
-4. Send a text, link, code snippet, file, or image from either app. Keep Android in the foreground
+1. Launch the Windows app in its default mode. Use the same LAN on both devices. Windows may
+   prompt for access on the private network profile. TCP 8443 carries transfers and UDP 5353
+   carries discovery.
+2. Select **Create pairing invitation** on Windows. Scan the QR in LanInbox on Android or enter
+   the displayed address, fingerprint, and invitation. Grant local network access if prompted.
+3. Send a text, link, code snippet, file, or image from either app. Keep Android in the foreground
    when receiving. Both inboxes support saving files and previewing supported images.
 
-When the Windows IP changes, issue a certificate that covers the new address and pair again.
-The development receiver keeps one pairing session in memory and one pending outgoing delivery.
-Restarting Windows LanInbox discards pending deliveries and pairing credentials. Received
-items are kept on disk.
+When the Windows address changes, Android uses discovery to find the saved fingerprint at the
+new address. If multicast is filtered, enter the new Windows address and select
+**Reconnect to paired computer**. A network that isolates clients can also block direct TCP
+connections. The Windows app remembers one paired phone and keeps one outgoing delivery queued
+until acknowledgment. Received items are kept on disk. Pending outgoing deliveries are discarded
+on desktop shutdown.
 
 ## Exercise local pairing
 
@@ -65,10 +72,9 @@ invalidates the previous one. A failed or replayed redemption returns HTTP 400 w
 
 Successful redemption returns HTTP 200 and a JSON `credential`. Send it in the
 `Authorization: Bearer <credential>` header to `GET /v1/pairing/session`. A valid credential
-returns HTTP 204. A missing or invalid credential returns HTTP 401. The desktop app holds one
-credential in memory. Successful re-pairing replaces it. **Clear invitation and revoke session**
-or restarting the app invalidates it. Keep the invitation and credential out of URLs, shell
-history, and logs.
+returns HTTP 204. A missing or invalid credential returns HTTP 401. Successful re-pairing
+replaces the previous credential. **Clear invitation and revoke session** deletes its verifier.
+Keep the invitation and credential out of URLs, shell history, and logs.
 
 Run `./gradlew :desktopApp:test --tests '*DesktopIdentityServerTest'` to check trusted TLS,
 rejection of an untrusted certificate, the fingerprint of the handshake key, and route isolation.

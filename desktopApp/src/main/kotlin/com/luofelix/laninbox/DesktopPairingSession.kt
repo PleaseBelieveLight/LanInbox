@@ -8,8 +8,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.TimeSource
 
-/** Holds a single invitation and credential for the lifetime of the loopback receiver. */
-internal class DesktopPairingSession(private val clock: TimeSource = TimeSource.Monotonic) {
+/** Holds one short-lived invitation and one revocable pairing verifier. */
+internal class DesktopPairingSession(
+    private val clock: TimeSource = TimeSource.Monotonic,
+    private val store: PairingVerifierStore? = null,
+) {
     private val random = SecureRandom()
     private val mutableInvitation = MutableStateFlow<String?>(null)
     val invitation = mutableInvitation.asStateFlow()
@@ -18,6 +21,13 @@ internal class DesktopPairingSession(private val clock: TimeSource = TimeSource.
     private var generation = 0L
     private val mutableSession = MutableStateFlow<Long?>(null)
     val activeSession = mutableSession.asStateFlow()
+
+    @Synchronized
+    fun restore() {
+        val saved = store?.read() ?: return
+        credentialDigest = saved
+        mutableSession.value = ++generation
+    }
 
     @Synchronized
     fun issueInvitation() {
@@ -37,7 +47,9 @@ internal class DesktopPairingSession(private val clock: TimeSource = TimeSource.
 
         // Keep consumption and credential replacement atomic across concurrent requests.
         val credential = newSecret()
-        credentialDigest = digest(credential)
+        val verifier = digest(credential)
+        store?.write(verifier)
+        credentialDigest = verifier
         mutableSession.value = ++generation
         mutableInvitation.value = null
         return credential
@@ -57,6 +69,7 @@ internal class DesktopPairingSession(private val clock: TimeSource = TimeSource.
 
     @Synchronized
     fun revoke() {
+        store?.write(null)
         mutableInvitation.value = null
         credentialDigest = null
         mutableSession.value = null

@@ -11,6 +11,10 @@ import com.luofelix.laninbox.core.network.MessageAcknowledgment
 import com.luofelix.laninbox.core.network.MessageJson
 import com.luofelix.laninbox.core.network.MessageRequest
 import com.luofelix.laninbox.core.network.OutboundDelivery
+import com.luofelix.laninbox.core.network.PairedDevice
+import com.luofelix.laninbox.core.network.SECURE_PORT
+import com.luofelix.laninbox.core.network.isFingerprint
+import com.luofelix.laninbox.core.network.isPairingSecret
 import com.luofelix.laninbox.core.network.privateLanAuthority
 import com.luofelix.laninbox.feature.send.DeliveryResult
 import java.io.File
@@ -49,8 +53,15 @@ class SessionExpired : IOException("Pairing session expired")
 class SecureLanClient private constructor(
     val address: String,
     private val http: OkHttpClient,
-    private val credential: String,
+    val device: PairedDevice,
 ) {
+    suspend fun validateSession() {
+        http.exchange(request("/v1/pairing/session")) { response ->
+            response.requireSuccess()
+            if (response.code != 204) throw IOException("Invalid pairing session response")
+        }
+    }
+
     suspend fun sendMessage(message: MessageRequest): DeliveryResult = try {
         http.exchange(request(MESSAGE_ROUTE).post(MessageJson.encodeToString(message).toRequestBody(json))) { response ->
             if (!response.isSuccessful) DeliveryResult.Rejected
@@ -147,16 +158,52 @@ class SecureLanClient private constructor(
     }
 
     private fun request(path: String): Request.Builder =
-        Request.Builder().url("https://$address$path").header("Authorization", "Bearer $credential")
+        Request.Builder().url("https://$address$path").header("Authorization", "Bearer ${device.credential}")
 
     companion object {
         suspend fun pair(address: String, fingerprint: String, invitation: String): SecureLanClient {
-            val endpoint = privateLanAuthority(address, 8443) ?: loopbackAuthority(address)
-                ?: throw IOException("Invalid local IPv4 address")
+            val endpoint = endpoint(address)
             val pin = fingerprint.trim()
-            if (!pin.matches(Regex("sha256/[A-Za-z0-9+/]{43}="))) throw IOException("Invalid fingerprint")
+            val client = pinnedHttpClient(pin)
+            val payload = buildJsonObject { put("code", invitation.trim()) }.toString()
+            val credential = client.exchange(
+                Request.Builder().url("https://$endpoint/v1/pairing").post(payload.toRequestBody(json)),
+            ) { response ->
+                response.requireSuccess()
+                MessageJson.parseToJsonElement(response.readJson()).jsonObject["credential"]
+                    ?.jsonPrimitive?.content?.takeIf(::isPairingSecret)
+                    ?: throw IOException("Invalid pairing response")
+            }
+            return SecureLanClient(endpoint, client, PairedDevice(endpoint, pin, credential))
+        }
+
+        suspend fun reconnect(device: PairedDevice, address: String = device.address): SecureLanClient {
+            val endpoint = endpoint(address)
+            if (!isPairingSecret(device.credential)) throw IOException("Invalid pairing credential")
+            val connection = SecureLanClient(
+                endpoint, pinnedHttpClient(device.fingerprint),
+                PairedDevice(endpoint, device.fingerprint, device.credential),
+            )
+            try {
+                connection.validateSession()
+                return connection
+            } catch (error: Exception) {
+                connection.close()
+                throw error
+            }
+        }
+
+        private fun endpoint(address: String): String =
+            privateLanAuthority(address, SECURE_PORT) ?: loopbackAuthority(address)
+                ?: throw IOException("Invalid local IPv4 address")
+
+        private fun pinnedHttpClient(pin: String): OkHttpClient {
+            if (!isFingerprint(pin)) throw IOException("Invalid fingerprint")
             val expected = pin.substringAfter('/').decodeBase64()?.toByteArray()
                 ?: throw IOException("Invalid fingerprint")
+            fun matches(certificate: X509Certificate): Boolean = MessageDigest.isEqual(
+                expected, MessageDigest.getInstance("SHA-256").digest(certificate.publicKey.encoded),
+            )
             val trust = object : X509TrustManager {
                 override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
                 override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {
@@ -165,14 +212,16 @@ class SecureLanClient private constructor(
                 override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
                     val leaf = chain.firstOrNull() ?: throw CertificateException("Missing server certificate")
                     leaf.checkValidity()
-                    val actual = MessageDigest.getInstance("SHA-256").digest(leaf.publicKey.encoded)
-                    if (!MessageDigest.isEqual(expected, actual)) throw CertificateException("Unexpected server key")
+                    if (!matches(leaf)) throw CertificateException("Unexpected server key")
                 }
             }
-            // The pin is the trust anchor. OkHttp still checks the address against the certificate SAN.
+            // An out-of-band pinned key identifies the peer even when its DHCP address changes.
             val tls = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), null) }
-            val client = OkHttpClient.Builder()
+            return OkHttpClient.Builder()
                 .sslSocketFactory(tls.socketFactory, trust)
+                .hostnameVerifier { _, session ->
+                    (session.peerCertificates.firstOrNull() as? X509Certificate)?.let(::matches) == true
+                }
                 .proxy(Proxy.NO_PROXY)
                 .followRedirects(false)
                 .retryOnConnectionFailure(false)
@@ -181,16 +230,6 @@ class SecureLanClient private constructor(
                 .writeTimeout(15, TimeUnit.SECONDS)
                 .callTimeout(5, TimeUnit.MINUTES)
                 .build()
-            val payload = buildJsonObject { put("code", invitation.trim()) }.toString()
-            val credential = client.exchange(
-                Request.Builder().url("https://$endpoint/v1/pairing").post(payload.toRequestBody(json)),
-            ) { response ->
-                response.requireSuccess()
-                MessageJson.parseToJsonElement(response.readJson()).jsonObject["credential"]
-                    ?.jsonPrimitive?.content?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{43}")) }
-                    ?: throw IOException("Invalid pairing response")
-            }
-            return SecureLanClient(endpoint, client, credential)
         }
     }
 }

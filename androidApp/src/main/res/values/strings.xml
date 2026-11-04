@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">LanInbox</string>
+    <string name="pairing_scanner_prompt">Scan the QR code shown in LanInbox on Windows.</string>
 </resources>

@@ -2,18 +2,21 @@ package com.luofelix.laninbox
 
 import com.luofelix.laninbox.core.network.MessageJson
 import com.luofelix.laninbox.core.network.MessageKind
+import com.luofelix.laninbox.core.network.MAX_ATTACHMENT_BYTES
 import com.luofelix.laninbox.core.network.OutboundDelivery
 import io.ktor.network.tls.certificates.buildKeyStore
 import io.ktor.network.tls.extensions.HashAlgorithm
 import java.awt.image.BufferedImage
 import java.net.URI
 import java.io.IOException
+import java.io.OutputStream
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.security.KeyStore
 import java.security.MessageDigest
+import java.security.DigestOutputStream
 import java.time.Duration
 import java.util.Base64
 import java.util.HexFormat
@@ -54,8 +57,7 @@ class DesktopIdentityServerTest {
             val inbox = DesktopInbox(directory.resolve("inbox.sqlite"))
             runBlocking { inbox.initialize() }
             val server = desktopIdentityServer(
-                file,
-                password,
+                loadDesktopIdentity(file, password),
                 attachments,
                 port = 0,
                 pairing = pairing,
@@ -220,6 +222,36 @@ class DesktopIdentityServerTest {
                             com.luofelix.laninbox.feature.send.DeliveryResult.Delivered,
                             androidClient.sendMessage(incomingMessage),
                         )
+                        val large = directory.resolve("large.bin")
+                        val block = ByteArray(64 * 1024) { (it % 251).toByte() }
+                        Files.newOutputStream(large).use { output ->
+                            repeat((MAX_ATTACHMENT_BYTES / block.size).toInt() - 1) { output.write(block) }
+                            output.write(block, 0, block.size - 1)
+                        }
+                        assertTrue(outbox.enqueueFile(sharedOwner, large))
+                        val largeOffer = assertNotNull(androidClient.next())
+                        val largeAttachment = assertNotNull(largeOffer.attachment)
+                        assertEquals(MAX_ATTACHMENT_BYTES - 1, largeAttachment.size)
+                        val largeRequest = HttpRequest.newBuilder(URI.create("$baseUrl/v1/outbox/${largeOffer.id}/payload"))
+                            .timeout(Duration.ofSeconds(30))
+                            .header("Authorization", "Bearer ${androidClient.device.credential}")
+                            .build()
+                        val streaming = client.send(largeRequest, HttpResponse.BodyHandlers.ofInputStream())
+                        assertEquals(200, streaming.statusCode())
+                        streaming.body().use { input ->
+                            assertEquals(
+                                503,
+                                client.send(largeRequest, HttpResponse.BodyHandlers.discarding()).statusCode(),
+                            )
+                            val digestStream = MessageDigest.getInstance("SHA-256")
+                            DigestOutputStream(OutputStream.nullOutputStream(), digestStream).use { output ->
+                                assertEquals(largeAttachment.size, input.transferTo(output))
+                            }
+                            assertEquals(largeAttachment.sha256, HexFormat.of().formatHex(digestStream.digest()))
+                        }
+                        androidClient.acknowledge(largeOffer.id)
+                        androidClient.upload(largeAttachment, large.toFile()) {}
+                        assertEquals(largeAttachment.size, Files.size(attachments.payload(largeAttachment)))
                         pairing.revoke()
                         assertFailsWith<SessionExpired> { androidClient.next() }
                     } finally {

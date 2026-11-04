@@ -19,8 +19,18 @@ ktor = "3.5.2"
 serialization = "1.11.0"
 sqlite-jdbc = "3.41.2.2"
 okhttp = "4.12.0"
+jmdns = "3.6.3"
+zxing = "3.5.3"
+zxing-android = "4.3.0"
+jna = "5.18.1"
 
 [libraries]
+jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+zxing-scanner = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxing-android" }
+jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock-jvm", version.ref = "ktor" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm", version.ref = "kotlinx-coroutines" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }

@@ -2,14 +2,15 @@ package com.luofelix.laninbox
 
 import android.app.Application
 import android.net.Uri
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.luofelix.laninbox.core.network.AttachmentInfo
 import com.luofelix.laninbox.core.network.OutboundDelivery
+import com.luofelix.laninbox.core.network.PairedDevice
 import com.luofelix.laninbox.feature.send.TransferStatus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal data class FileTransferState(
     val status: TransferStatus? = null,
@@ -26,6 +28,12 @@ internal data class FileTransferState(
 
 internal class AndroidTransferViewModel(application: Application) : AndroidViewModel(application) {
     val files = AndroidTransferFiles(application)
+    private val deviceStore = AndroidPairedDeviceStore(application)
+    private val mutableRemembered = MutableStateFlow<PairedDevice?>(null)
+    val remembered = mutableRemembered.asStateFlow()
+    private val mutableDevices = MutableStateFlow<List<DiscoveredDesktop>>(emptyList())
+    val devices = mutableDevices.asStateFlow()
+    private var networkAllowed = false
     private val mutableClient = MutableStateFlow<SecureLanClient?>(null)
     val client = mutableClient.asStateFlow()
     private val pairingState = MutableStateFlow<TransferStatus?>(null)
@@ -44,6 +52,16 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
 
     init {
         viewModelScope.launch { history.value = files.recent() }
+        viewModelScope.launch {
+            try {
+                mutableRemembered.value = withContext(Dispatchers.IO) { deviceStore.read() }
+                reconnectSaved()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                pairingState.value = TransferStatus.Failed
+            }
+        }
     }
 
     fun pair(address: String, fingerprint: String, invitation: String) {
@@ -51,14 +69,11 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
         pairingState.value = TransferStatus.Preparing
         viewModelScope.launch {
             try {
-                mutableClient.value = SecureLanClient.pair(address, fingerprint, invitation)
-                receptionEnabled.value = true
-                received.value = FileTransferState()
-                pairingState.value = null
+                acceptConnection(SecureLanClient.pair(address, fingerprint, invitation))
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                Log.i("LanInbox", "HTTPS pairing failed type=${error.javaClass.simpleName} cause=${error.cause?.javaClass?.simpleName}")
+                androidLogger.warn("HTTPS pairing failed", "type" to error.javaClass.simpleName)
                 pairingState.value = TransferStatus.Failed
             }
         }
@@ -68,11 +83,67 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
         pairingState.value = TransferStatus.PermissionRequired
     }
 
+    fun invalidInvitation() {
+        pairingState.value = TransferStatus.Failed
+    }
+
+    fun discoveryChanged(discovered: List<DiscoveredDesktop>) {
+        mutableDevices.value = discovered
+        reconnectSaved()
+    }
+
+    fun networkPermissionChanged(allowed: Boolean) {
+        networkAllowed = allowed
+        if (allowed) reconnectSaved()
+    }
+
+    fun reconnectSaved(address: String? = null) {
+        val device = remembered.value ?: return
+        if (!networkAllowed || client.value != null || pairingState.value == TransferStatus.Preparing) return
+        val discovered = devices.value.firstOrNull { it.fingerprint == device.fingerprint }?.address
+        val endpoint = address?.takeIf { it.isNotBlank() } ?: discovered ?: device.address
+        pairingState.value = TransferStatus.Preparing
+        viewModelScope.launch {
+            try {
+                acceptConnection(SecureLanClient.reconnect(device, endpoint))
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: SessionExpired) {
+                disconnect()
+                pairingState.value = TransferStatus.Failed
+            } catch (_: Exception) {
+                pairingState.value = TransferStatus.Failed
+                // A matching service may have resolved while the stored address was being tried.
+                val updated = devices.value.firstOrNull { it.fingerprint == device.fingerprint }?.address
+                if (updated != null && updated != endpoint) reconnectSaved(updated)
+            }
+        }
+    }
+
+    private suspend fun acceptConnection(connection: SecureLanClient) {
+        try {
+            withContext(Dispatchers.IO) { deviceStore.write(connection.device) }
+        } catch (error: Exception) {
+            connection.close()
+            throw error
+        }
+        mutableRemembered.value = connection.device
+        mutableClient.value = connection
+        receptionEnabled.value = true
+        received.value = FileTransferState()
+        pairingState.value = null
+    }
+
     fun disconnect() {
         val previous = mutableClient.value
         mutableClient.value = null
         previous?.close()
         cancelUpload()
+        staged?.file?.delete()
+        staged = null
+        selected = null
+        mutableRemembered.value = null
+        viewModelScope.launch { withContext(Dispatchers.IO) { deviceStore.write(null) } }
         received.value = FileTransferState()
         pairingState.value = null
     }
@@ -137,10 +208,12 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
     }
 
     private suspend fun receiveLoop(connection: SecureLanClient) {
+        var downloading = false
         try {
             while (true) {
                 val delivery = connection.next()
                 if (delivery != null) {
+                    downloading = true
                     val attachment = delivery.attachment
                     received.value = FileTransferState(TransferStatus.Receiving, attachment?.name, 0f)
                     files.receive(connection, delivery) { bytes ->
@@ -151,6 +224,7 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
                     history.value = files.recent()
                     connection.acknowledge(delivery.id)
                     received.value = FileTransferState(TransferStatus.Delivered, attachment?.name, 1f)
+                    downloading = false
                 }
                 delay(1_500)
             }
@@ -160,8 +234,17 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
             expire(connection)
         } catch (_: Exception) {
             if (client.value === connection) {
-                receptionEnabled.value = false
-                received.update { it.copy(status = TransferStatus.Failed) }
+                if (!downloading) {
+                    mutableClient.value = null
+                    connection.close()
+                    pairingState.value = TransferStatus.Failed
+                    if (devices.value.any { it.fingerprint == connection.device.fingerprint && it.address != connection.address }) {
+                        reconnectSaved()
+                    }
+                } else {
+                    receptionEnabled.value = false
+                    received.update { it.copy(status = TransferStatus.Failed) }
+                }
             }
         }
     }
@@ -169,6 +252,8 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
     private fun expire(connection: SecureLanClient) {
         if (mutableClient.compareAndSet(connection, null)) {
             connection.close()
+            mutableRemembered.value = null
+            viewModelScope.launch { withContext(Dispatchers.IO) { deviceStore.write(null) } }
             pairingState.value = TransferStatus.Failed
             received.update { it.copy(status = TransferStatus.Failed) }
         }
@@ -176,6 +261,19 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
 
     fun selectExport(attachment: AttachmentInfo) {
         selectedExport = attachment
+    }
+
+    fun deleteHistory(id: String?) {
+        viewModelScope.launch {
+            try {
+                files.delete(id)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                received.update { it.copy(status = TransferStatus.Failed) }
+            }
+            history.value = files.recent()
+        }
     }
 
     fun completeExport(uri: Uri?) {

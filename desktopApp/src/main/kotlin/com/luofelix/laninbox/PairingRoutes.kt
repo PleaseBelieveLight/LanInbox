@@ -14,6 +14,9 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.utils.io.readRemaining
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.io.readByteArray
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonObject
@@ -30,7 +33,18 @@ internal fun Route.pairingRoutes(session: DesktopPairingSession) {
         } else {
             null
         }
-        val credential = code?.let(session::redeem)
+        val credential = try {
+            code?.let { withContext(Dispatchers.IO) { session.redeem(it) } }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            call.respondText(
+                MessageJson.encodeToString(ProtocolError("pairing_storage_failure")),
+                ContentType.Application.Json,
+                HttpStatusCode.InternalServerError,
+            )
+            return@post
+        }
         if (credential == null) {
             call.respondText(
                 MessageJson.encodeToString(ProtocolError("invalid_pairing_invitation")),
