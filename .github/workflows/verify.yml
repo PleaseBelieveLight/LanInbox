@@ -32,8 +32,9 @@ jobs:
           $wix | Out-File -FilePath $env:GITHUB_PATH -Append
           "WIX_PATH=$wix" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Build, test, and package
+        # Keep the dotted Gradle property together when PowerShell invokes gradlew.bat.
         run: >
-          .\gradlew.bat --no-daemon --no-configuration-cache -Pandroid.builder.sdkDownload=false
+          .\gradlew.bat --no-daemon --no-configuration-cache '-Pandroid.builder.sdkDownload=false'
           :androidApp:assembleDebug :shared:testAndroidHostTest :shared:jvmTest
           :desktopApp:test :desktopApp:packageMsi
       - name: Upload builds
