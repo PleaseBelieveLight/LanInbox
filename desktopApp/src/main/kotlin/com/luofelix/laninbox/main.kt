@@ -209,7 +209,7 @@ fun main() = application {
                     receiverReady = ready,
                     host = discoveredAddress ?: bindAddress.takeUnless { it == "0.0.0.0" },
                     fingerprint = fingerprint,
-                    paired = pairedSession != null,
+                    pairedSession = pairedSession,
                     pairing = pairing,
                     state = transferState,
                     deviceName = deviceName,

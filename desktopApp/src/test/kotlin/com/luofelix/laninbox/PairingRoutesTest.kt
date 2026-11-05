@@ -64,6 +64,28 @@ class PairingRoutesTest {
     }
 
     @Test
+    fun keepsOldPairingUntilReplacementInvitationIsRedeemed() {
+        val clock = TestTimeSource()
+        val session = DesktopPairingSession(clock)
+        session.issueInvitation()
+        val original = assertNotNull(session.redeem(assertNotNull(session.invitation.value)))
+        val originalAuthorization = "Bearer $original"
+        val originalSession = assertNotNull(session.authorizedSession(originalAuthorization))
+
+        session.issueInvitation()
+        val expired = assertNotNull(session.invitation.value)
+        assertEquals(originalSession, session.authorizedSession(originalAuthorization))
+        clock += 2.minutes
+        session.expireInvitation(expired)
+        assertEquals(originalSession, session.authorizedSession(originalAuthorization))
+
+        session.issueInvitation()
+        val replacement = assertNotNull(session.redeem(assertNotNull(session.invitation.value)))
+        assertEquals(null, session.authorizedSession(originalAuthorization))
+        assertNotNull(session.authorizedSession("Bearer $replacement"))
+    }
+
+    @Test
     fun invitationExpiryKeepsARefreshedCode() {
         val clock = TestTimeSource()
         val session = DesktopPairingSession(clock)

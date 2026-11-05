@@ -47,7 +47,10 @@
     <string name="transfer_waiting">Waiting for your phone. Open LanInbox on your phone to receive.</string>
     <string name="connect_to_send">Connect to send</string>
     <string name="connect_phone">Connect phone</string>
-    <string name="paired_phone">Phone paired</string>
+    <string name="paired_phone">Saved phone pairing</string>
+    <string name="paired_phone_detail">This computer has a saved phone pairing.</string>
+    <string name="pairing_again">Pair again</string>
+    <string name="pairing_replacement_hint">Completing pairing will replace the saved phone pairing.</string>
     <string name="connect_computer">Connect computer</string>
     <string name="device_connected">Connected</string>
     <string name="device_disconnected">Not connected</string>

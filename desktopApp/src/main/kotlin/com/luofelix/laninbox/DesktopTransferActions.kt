@@ -221,12 +221,13 @@ internal fun DesktopConnection(
     receiverReady: Boolean,
     host: String?,
     fingerprint: String,
-    paired: Boolean,
+    pairedSession: Long?,
     pairing: DesktopPairingSession,
     state: DesktopTransferState,
     deviceName: String,
     onDeviceName: (String) -> Unit,
 ) {
+    val paired = pairedSession != null
     OutlinedButton(onClick = onOpen) {
         Text(stringResource(if (paired) Res.string.paired_phone else Res.string.connect_phone))
     }
@@ -243,6 +244,7 @@ internal fun DesktopConnection(
     val address = host?.let { "$it:$SECURE_PORT" }
     val qrAddress = address?.let { privateLanAuthority(it, SECURE_PORT) }
     val invitation = code
+    var replacingPairing by remember(pairedSession) { mutableStateOf(false) }
     var details by remember { mutableStateOf(false) }
     var confirmingForget by remember { mutableStateOf(false) }
     var name by remember(deviceName) { mutableStateOf(deviceName) }
@@ -261,8 +263,21 @@ internal fun DesktopConnection(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (replacingPairing) Text(stringResource(Res.string.pairing_replacement_hint))
                 when {
-                    paired -> Text(stringResource(Res.string.paired_phone))
+                    paired && !replacingPairing -> {
+                        Text(stringResource(Res.string.paired_phone_detail))
+                        Button(
+                            enabled = receiverReady && address != null,
+                            onClick = {
+                                replacingPairing = true
+                                pairing.issueInvitation()
+                            },
+                        ) { Text(stringResource(Res.string.pairing_again)) }
+                        if (!receiverReady || address == null) {
+                            Text(stringResource(Res.string.pairing_no_address))
+                        }
+                    }
                     !receiverReady || qrAddress == null -> Text(stringResource(Res.string.pairing_no_address))
                     qr != null -> {
                         Text(stringResource(Res.string.pairing_scan_hint))
@@ -288,11 +303,13 @@ internal fun DesktopConnection(
                     if (fingerprint.isNotEmpty()) {
                         SelectionContainer { Text("${stringResource(Res.string.secure_fingerprint)}\n$fingerprint") }
                     }
-                    invitation?.let { value ->
-                        SelectionContainer { Text("${stringResource(Res.string.secure_invitation)}\n$value") }
-                    }
-                    if (!paired && receiverReady && qrAddress == null && address != null) {
-                        TextButton(onClick = pairing::issueInvitation) { Text(stringResource(Res.string.pairing_issue_invitation)) }
+                    if (!paired || replacingPairing) {
+                        invitation?.let { value ->
+                            SelectionContainer { Text("${stringResource(Res.string.secure_invitation)}\n$value") }
+                        }
+                        if (receiverReady && qrAddress == null && address != null) {
+                            TextButton(onClick = pairing::issueInvitation) { Text(stringResource(Res.string.pairing_issue_invitation)) }
+                        }
                     }
                     if (paired) {
                         TextButton(onClick = { confirmingForget = true }) { Text(stringResource(Res.string.pairing_revoke)) }

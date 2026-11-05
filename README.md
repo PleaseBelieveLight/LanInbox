@@ -39,6 +39,8 @@ keep LanInbox in the foreground on Android until the file appears in its inbox.
 
 ### Connection troubleshooting
 
+- **Pair again if the phone only shows Scan to connect.** On Windows, open **Saved phone
+  pairing** and choose **Pair again**, then scan the new QR code with the phone.
 - **Pair manually.** Open **Connection details** on Windows and enter the LAN address,
   certificate fingerprint, and pairing invitation under **Connect manually** on Android.
 - **Check local network access.** Grant permission on Android when prompted and allow LanInbox
