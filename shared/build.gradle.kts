@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.androidMultiplatformLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
@@ -29,11 +30,20 @@ kotlin {
        }
     }
     sourceSets {
+        androidMain.get().kotlin.srcDir("src/jvmAndAndroidMain/kotlin")
+        jvmMain.get().kotlin.srcDir("src/jvmAndAndroidMain/kotlin")
         androidMain.dependencies {
+            implementation(libs.ktor.client.cio)
+            implementation(libs.okhttp)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
         }
+        jvmMain.dependencies {
+            implementation(libs.okhttp)
+        }
         commonMain.dependencies {
+            implementation(libs.ktor.client.core)
+            implementation(libs.serialization.json)
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
@@ -46,6 +56,10 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
+        jvmTest.dependencies {
+            implementation(libs.ktor.client.mock)
+            implementation(libs.coroutines.test)
+        }
         getByName("androidDeviceTest").dependencies {
             implementation(libs.androidx.testRunner)
         }
@@ -54,4 +68,8 @@ kotlin {
 
 dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
+}
+
+compose.resources {
+    publicResClass = true
 }

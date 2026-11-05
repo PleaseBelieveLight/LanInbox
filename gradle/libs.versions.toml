@@ -15,8 +15,32 @@ junit = "4.13.2"
 kotlin = "2.4.21"
 kotlinx-coroutines = "1.11.0"
 material3 = "1.12.0-alpha03"
+ktor = "3.5.2"
+serialization = "1.11.0"
+sqlite-jdbc = "3.41.2.2"
+okhttp = "4.12.0"
+jmdns = "3.6.3"
+zxing = "3.5.3"
+zxing-android = "4.3.0"
+jna = "5.18.1"
+slf4j = "2.0.18"
 
 [libraries]
+jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+zxing-scanner = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxing-android" }
+jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
+slf4j-nop = { module = "org.slf4j:slf4j-nop", version.ref = "slf4j" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock-jvm", version.ref = "ktor" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm", version.ref = "kotlinx-coroutines" }
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
+ktor-server-test = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+ktor-tls-certificates = { module = "io.ktor:ktor-network-tls-certificates", version.ref = "ktor" }
+serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-testJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 junit = { module = "junit:junit", version.ref = "junit" }
@@ -38,6 +62,7 @@ compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-previ
 kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 
 [plugins]
+kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidMultiplatformLibrary = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }

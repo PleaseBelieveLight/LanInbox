@@ -1,0 +1,38 @@
+name: Verify LanInbox
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-build
+      - name: Build, test, and package
+        # Keep the dotted Gradle property together when PowerShell invokes gradlew.bat.
+        run: >
+          .\gradlew.bat --no-daemon --no-configuration-cache '-Pandroid.builder.sdkDownload=false'
+          :androidApp:assembleDebug :shared:testAndroidHostTest :shared:jvmTest
+          :desktopApp:test :desktopApp:packageMsi
+      - name: Upload builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: laninbox-verification-builds
+          if-no-files-found: error
+          path: |
+            androidApp/build/outputs/apk/debug/*.apk
+            desktopApp/build/compose/binaries/main/msi/*.msi
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: laninbox-test-reports
+          path: '**/build/reports/tests/**'

@@ -1,0 +1,203 @@
+name: Draft LanInbox release
+run-name: Draft release ${{ inputs.tag || github.ref_name }}
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag, for example v1.0.0-beta.1
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.version.outputs.commit }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - name: Validate tag format
+        shell: pwsh
+        run: |
+          if ($env:RELEASE_TAG -cnotmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(alpha|beta|rc)\.([1-9][0-9]*))?$') {
+            throw 'Use vMAJOR.MINOR.PATCH with an optional -alpha.N, -beta.N, or -rc.N suffix.'
+          }
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Read release version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content -LiteralPath VERSION -Raw).Trim()
+          if ($env:RELEASE_TAG -cne "v$version") {
+            throw 'The release tag must match VERSION in the tagged commit.'
+          }
+          $notes = "docs/releases/$version.md"
+          if (!(Test-Path -LiteralPath $notes) -or [string]::IsNullOrWhiteSpace((Get-Content -LiteralPath $notes -Raw))) {
+            throw "Add release notes at $notes before tagging."
+          }
+          $commit = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Could not resolve the release commit.' }
+          if ($env:GITHUB_EVENT_NAME -eq 'push') {
+            $eventCommit = git rev-parse "$($env:GITHUB_SHA)^{commit}"
+            if ($LASTEXITCODE -ne 0 -or $eventCommit -ne $commit) {
+              throw 'The tag no longer points to the commit that triggered this run.'
+            }
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "commit=$commit" >> $env:GITHUB_OUTPUT
+          "prerelease=$($version.Contains('-').ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+      - uses: ./.github/actions/setup-build
+      - name: Restore Android release keystore
+        shell: pwsh
+        env:
+          LANINBOX_KEYSTORE_BASE64: ${{ secrets.LANINBOX_KEYSTORE_BASE64 }}
+          LANINBOX_KEYSTORE_PASSWORD: ${{ secrets.LANINBOX_KEYSTORE_PASSWORD }}
+          LANINBOX_KEY_ALIAS: ${{ secrets.LANINBOX_KEY_ALIAS }}
+          LANINBOX_KEY_PASSWORD: ${{ secrets.LANINBOX_KEY_PASSWORD }}
+        run: |
+          foreach ($name in @('LANINBOX_KEYSTORE_BASE64', 'LANINBOX_KEYSTORE_PASSWORD', 'LANINBOX_KEY_ALIAS', 'LANINBOX_KEY_PASSWORD')) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "Configure the $name Actions secret before running a release."
+            }
+          }
+          $keystore = Join-Path $env:RUNNER_TEMP 'laninbox-release.jks'
+          [IO.File]::WriteAllBytes($keystore, [Convert]::FromBase64String($env:LANINBOX_KEYSTORE_BASE64))
+          "LANINBOX_KEYSTORE_PATH=$keystore" >> $env:GITHUB_ENV
+      - name: Build, test, and package release
+        env:
+          LANINBOX_KEYSTORE_PASSWORD: ${{ secrets.LANINBOX_KEYSTORE_PASSWORD }}
+          LANINBOX_KEY_ALIAS: ${{ secrets.LANINBOX_KEY_ALIAS }}
+          LANINBOX_KEY_PASSWORD: ${{ secrets.LANINBOX_KEY_PASSWORD }}
+        run: >
+          .\gradlew.bat --no-daemon --no-configuration-cache '-Pandroid.builder.sdkDownload=false'
+          :androidApp:assembleRelease :shared:testAndroidHostTest :shared:jvmTest
+          :desktopApp:test :desktopApp:packageMsi
+      - name: Prepare release assets
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_COMMIT: ${{ steps.version.outputs.commit }}
+        run: |
+          $destination = Join-Path $env:RUNNER_TEMP 'laninbox-release'
+          New-Item -ItemType Directory -Path $destination | Out-Null
+          $apks = @(Get-ChildItem -LiteralPath androidApp/build/outputs/apk/release -Filter *.apk -File)
+          $installers = @(Get-ChildItem -LiteralPath desktopApp/build/compose/binaries/main/msi -Filter *.msi -File)
+          if ($apks.Count -ne 1 -or $installers.Count -ne 1) {
+            throw 'Expected exactly one Release APK and one Windows x64 MSI.'
+          }
+          $certificate = & "$env:ANDROID_HOME/build-tools/36.0.0/apksigner.bat" verify --verbose --print-certs $apks[0].FullName
+          if ($LASTEXITCODE -ne 0) { throw 'Release APK signature verification failed.' }
+          $certificate | Set-Content -LiteralPath "$destination/ANDROID-SIGNING-CERTIFICATE.txt" -Encoding utf8
+          Copy-Item -LiteralPath $apks[0].FullName -Destination "$destination/LanInbox-${env:RELEASE_VERSION}-android.apk"
+          Copy-Item -LiteralPath $installers[0].FullName -Destination "$destination/LanInbox-${env:RELEASE_VERSION}-windows-x64.msi"
+          $properties = ConvertFrom-StringData (Get-Content -LiteralPath gradle.properties -Raw)
+          $parts = $env:RELEASE_VERSION.Split('-')[0].Split('.')
+          $windowsVersion = "$($parts[0]).$($parts[1]).$($properties['laninbox.windowsBuild'])"
+          @(
+            "version=$env:RELEASE_VERSION"
+            "tag=$env:RELEASE_TAG"
+            "commit=$env:RELEASE_COMMIT"
+            "androidVersionCode=$($properties['laninbox.androidVersionCode'])"
+            "windowsPackageVersion=$windowsVersion"
+            'windowsArchitecture=x64'
+          ) | Set-Content -LiteralPath "$destination/BUILD-INFO.txt" -Encoding utf8
+          $checksums = Get-ChildItem -LiteralPath $destination -File | Sort-Object Name | ForEach-Object {
+            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          }
+          # Use LF so the checksum manifest is portable to the Linux publication job.
+          [IO.File]::WriteAllText("$destination/SHA256SUMS.txt", ($checksums -join "`n") + "`n", [Text.Encoding]::ASCII)
+      - name: Remove Android release keystore
+        if: always()
+        shell: pwsh
+        run: |
+          $keystore = Join-Path $env:RUNNER_TEMP 'laninbox-release.jks'
+          if (Test-Path -LiteralPath $keystore) { Remove-Item -LiteralPath $keystore -Force }
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: laninbox-release-${{ env.RELEASE_TAG }}
+          path: ${{ runner.temp }}/laninbox-release/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: laninbox-release-test-reports-${{ env.RELEASE_TAG }}
+          path: '**/build/reports/tests/**'
+
+  draft:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ needs.build.outputs.version }}
+      RELEASE_COMMIT: ${{ needs.build.outputs.commit }}
+      IS_PRERELEASE: ${{ needs.build.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: laninbox-release-${{ env.RELEASE_TAG }}
+          path: release-assets
+      - name: Check asset checksums
+        working-directory: release-assets
+        run: sha256sum --check SHA256SUMS.txt
+      - name: Create release draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" != "$RELEASE_COMMIT" ]]; then
+            echo '::error::The release tag moved after the build.'
+            exit 1
+          fi
+          # Refuse both existing drafts and public releases; reruns never replace their assets.
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name' > "$RUNNER_TEMP/release-tags.txt"
+          if grep -Fxq -- "$RELEASE_TAG" "$RUNNER_TEMP/release-tags.txt"; then
+            echo '::error::A release already exists for this tag. See docs/releasing.md for recovery.'
+            exit 1
+          fi
+          cp "docs/releases/$RELEASE_VERSION.md" "$RUNNER_TEMP/release-notes.md"
+          printf '\n\n' >> "$RUNNER_TEMP/release-notes.md"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f "tag_name=$RELEASE_TAG" -f "target_commitish=$RELEASE_COMMIT" \
+            --jq '.body' >> "$RUNNER_TEMP/release-notes.md"
+          options=(--repo "$GITHUB_REPOSITORY" --verify-tag --draft --target "$RELEASE_COMMIT"
+            --title "LanInbox $RELEASE_VERSION" --notes-file "$RUNNER_TEMP/release-notes.md")
+          if [[ "$IS_PRERELEASE" == 'true' ]]; then
+            options+=(--prerelease --latest=false)
+          fi
+          gh release create "$RELEASE_TAG" release-assets/* "${options[@]}"
+          {
+            echo "Created draft for $RELEASE_TAG from $RELEASE_COMMIT."
+            echo
+            echo "Download the draft assets and complete docs/release-verification.md before publishing."
+            echo
+            echo "[Open Releases](https://github.com/$GITHUB_REPOSITORY/releases)"
+          } >> "$GITHUB_STEP_SUMMARY"

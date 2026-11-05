@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">LanInbox for Windows</title>
+  <rect x="4" y="4" width="120" height="120" rx="25" fill="#2457C5"/>
+  <path d="M31 66 V48 C31 42 36 37 42 37 H90 M78 25 L90 37 L78 49"
+        fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M97 62 V80 C97 86 92 91 86 91 H38 M50 79 L38 91 L50 103"
+        fill="none" stroke="#E3EEFF" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="58" y="58" width="12" height="12" rx="3" fill="#8FDCFF"/>
+</svg>
