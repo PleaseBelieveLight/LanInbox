@@ -1,6 +1,7 @@
 package com.luofelix.laninbox
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
@@ -247,6 +248,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @SuppressLint("SourceLockedOrientationActivity")
     @Composable
     private fun ScanPage(
         busy: Boolean,

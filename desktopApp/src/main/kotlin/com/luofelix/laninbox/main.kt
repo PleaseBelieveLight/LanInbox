@@ -197,8 +197,8 @@ fun main() = application {
             deleteAttachment = { changeHistory { attachmentStore.delete(it) } },
             clearHistory = { changeHistory { inbox.delete(null); attachmentStore.delete(null) } },
             exportAttachment = { attachment ->
-                chooseDesktopPath(window, FileDialog.SAVE, attachment.name)?.let { destination ->
-                    scope.launch {
+                scope.launch {
+                    chooseDesktopPath(window, FileDialog.SAVE, logger, attachment.name)?.let { destination ->
                         exportFailed = try {
                             withContext(Dispatchers.IO) {
                                 Files.copy(attachmentStore.payload(attachment), destination, REPLACE_EXISTING)
@@ -231,7 +231,7 @@ fun main() = application {
                 if (exportFailed) InboxOperationError()
             },
             composer = {
-                DesktopSendComposer(window, ready, pairedSession != null, outbox, transferState) {
+                DesktopSendComposer(window, ready, pairedSession != null, outbox, transferState, logger) {
                     showConnection = true
                 }
             },

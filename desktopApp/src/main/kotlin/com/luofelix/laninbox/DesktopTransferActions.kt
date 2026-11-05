@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +29,7 @@ import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.dp
+import com.luofelix.laninbox.core.logging.AppLogger
 import com.luofelix.laninbox.core.network.PairingInvitation
 import com.luofelix.laninbox.core.network.SECURE_PORT
 import com.luofelix.laninbox.core.network.privateLanAuthority
@@ -160,8 +162,11 @@ internal fun DesktopSendComposer(
     paired: Boolean,
     outbox: DesktopOutbox,
     state: DesktopTransferState,
+    logger: AppLogger,
     onConnect: () -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
+    var choosingFile by remember { mutableStateOf(false) }
     val queued by outbox.delivery.collectAsState()
     val delivered by outbox.delivered.collectAsState()
     val active = queued
@@ -191,11 +196,20 @@ internal fun DesktopSendComposer(
         asCode = state.asCode,
         onCodeChange = state::selectCode,
         file = source?.let { SelectedFile(it.fileName.toString(), size) },
-        onChoose = { chooseDesktopPath(window, FileDialog.LOAD)?.let(state::selectFile) },
+        onChoose = {
+            if (!choosingFile) scope.launch {
+                choosingFile = true
+                try {
+                    chooseDesktopPath(window, FileDialog.LOAD, logger)?.let(state::selectFile)
+                } finally {
+                    choosingFile = false
+                }
+            }
+        },
         onRemove = { state.selectFile(null) },
         onSubmit = if (receiverReady && paired) state::send else onConnect,
         connectRequired = !receiverReady || !paired,
-        enabled = !busy,
+        enabled = !busy && !choosingFile,
         failed = preparation == TransferStatus.Failed,
     ) {
         val status = when {
@@ -365,19 +379,6 @@ internal fun DesktopConnection(
                 TextButton(onClick = { confirmingForget = false }) { Text(stringResource(Res.string.attachment_cancel)) }
             },
         )
-    }
-}
-
-internal fun chooseDesktopPath(window: ComposeWindow, mode: Int, name: String? = null): Path? {
-    val picker = FileDialog(window, null, mode)
-    try {
-        picker.file = name
-        picker.isVisible = true
-        val file = picker.file ?: return null
-        val directory = picker.directory ?: return null
-        return Path.of(directory, file)
-    } finally {
-        picker.dispose()
     }
 }
 
