@@ -50,6 +50,9 @@
     <string name="paired_phone">Saved phone pairing</string>
     <string name="paired_phone_detail">This computer has a saved phone pairing.</string>
     <string name="pairing_again">Pair again</string>
+    <string name="pairing_success">Phone paired successfully</string>
+    <string name="pairing_success_detail">You can now send text and files between your phone and this computer.</string>
+    <string name="pairing_done">Done</string>
     <string name="pairing_replacement_hint">Completing pairing will replace the saved phone pairing.</string>
     <string name="connect_computer">Connect computer</string>
     <string name="device_connected">Connected</string>

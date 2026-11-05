@@ -228,8 +228,20 @@ internal fun DesktopConnection(
     onDeviceName: (String) -> Unit,
 ) {
     val paired = pairedSession != null
+    val confirmedPairing by pairing.confirmedPairing.collectAsState()
+    var acknowledgedPairing by remember(pairing) { mutableStateOf<Long?>(null) }
+    val pairingSucceeded = confirmedPairing != null && confirmedPairing == pairedSession &&
+        confirmedPairing != acknowledgedPairing
     OutlinedButton(onClick = onOpen) {
-        Text(stringResource(if (paired) Res.string.paired_phone else Res.string.connect_phone))
+        Text(
+            stringResource(
+                when {
+                    pairingSucceeded -> Res.string.pairing_success
+                    paired -> Res.string.paired_phone
+                    else -> Res.string.connect_phone
+                },
+            ),
+        )
     }
 
     val code by pairing.invitation.collectAsState()
@@ -255,16 +267,21 @@ internal fun DesktopConnection(
         if (invitation != null && qrAddress != null) pairingQr(PairingInvitation(qrAddress, fingerprint, invitation))
         else null
     }
+    fun closeConnection() {
+        if (pairingSucceeded) acknowledgedPairing = confirmedPairing
+        onClose()
+    }
     AlertDialog(
-        onDismissRequest = onClose,
-        title = { Text(stringResource(Res.string.connect_phone)) },
+        onDismissRequest = ::closeConnection,
+        title = { Text(stringResource(if (pairingSucceeded) Res.string.pairing_success else Res.string.connect_phone)) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (replacingPairing) Text(stringResource(Res.string.pairing_replacement_hint))
+                if (replacingPairing && !pairingSucceeded) Text(stringResource(Res.string.pairing_replacement_hint))
                 when {
+                    pairingSucceeded -> Text(stringResource(Res.string.pairing_success_detail))
                     paired && !replacingPairing -> {
                         Text(stringResource(Res.string.paired_phone_detail))
                         Button(
@@ -288,8 +305,10 @@ internal fun DesktopConnection(
                         Button(onClick = pairing::issueInvitation) { Text(stringResource(Res.string.pairing_refresh)) }
                     }
                 }
-                TextButton(onClick = { details = !details }) { Text(stringResource(Res.string.pairing_details)) }
-                if (details) {
+                if (!pairingSucceeded) {
+                    TextButton(onClick = { details = !details }) { Text(stringResource(Res.string.pairing_details)) }
+                }
+                if (details && !pairingSucceeded) {
                     OutlinedTextField(
                         name, { name = it.take(40) }, label = { Text(stringResource(Res.string.device_name)) },
                         singleLine = true, modifier = Modifier.fillMaxWidth(),
@@ -317,9 +336,13 @@ internal fun DesktopConnection(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onClose) { Text(stringResource(Res.string.close)) } },
+        confirmButton = {
+            TextButton(onClick = ::closeConnection) {
+                Text(stringResource(if (pairingSucceeded) Res.string.pairing_done else Res.string.close))
+            }
+        },
     )
-    if (confirmingForget) {
+    if (confirmingForget && !pairingSucceeded) {
         AlertDialog(
             onDismissRequest = { confirmingForget = false },
             title = { Text(stringResource(Res.string.pairing_confirm_forget)) },

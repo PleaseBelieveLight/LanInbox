@@ -20,6 +20,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.TestTimeSource
 
@@ -47,8 +48,11 @@ class PairingRoutesTest {
             header(HttpHeaders.Authorization, "Bearer $credential")
         }.status
 
+        assertNull(session.confirmedPairing.value)
         assertEquals(HttpStatusCode.NoContent, verify())
+        assertEquals(assertNotNull(session.activeSession.value), session.confirmedPairing.value)
         session.revoke()
+        assertNull(session.confirmedPairing.value)
         assertEquals(HttpStatusCode.Unauthorized, verify())
     }
 

@@ -21,11 +21,18 @@ internal class DesktopPairingSession(
     private var generation = 0L
     private val mutableSession = MutableStateFlow<Long?>(null)
     val activeSession = mutableSession.asStateFlow()
+    private var awaitingConfirmation: Long? = null
+    private val mutableConfirmedPairing = MutableStateFlow<Long?>(null)
+
+    /** The newly paired session once the phone makes its first authenticated request. */
+    val confirmedPairing = mutableConfirmedPairing.asStateFlow()
 
     @Synchronized
     fun restore() {
         val saved = store?.read() ?: return
         credentialDigest = saved
+        awaitingConfirmation = null
+        mutableConfirmedPairing.value = null
         mutableSession.value = ++generation
     }
 
@@ -57,7 +64,10 @@ internal class DesktopPairingSession(
         val verifier = digest(credential)
         store?.write(verifier)
         credentialDigest = verifier
-        mutableSession.value = ++generation
+        val session = ++generation
+        awaitingConfirmation = session
+        mutableConfirmedPairing.value = null
+        mutableSession.value = session
         mutableInvitation.value = null
         return credential
     }
@@ -67,9 +77,14 @@ internal class DesktopPairingSession(
         val expected = credentialDigest ?: return null
         if (authorization == null || !authorization.startsWith("Bearer ", ignoreCase = true)) return null
         val credential = authorization.substring(7)
-        return mutableSession.value.takeIf {
-            credential.length == 43 && MessageDigest.isEqual(expected, digest(credential))
+        if (credential.length != 43 || !MessageDigest.isEqual(expected, digest(credential))) return null
+        val session = mutableSession.value ?: return null
+        if (awaitingConfirmation == session) {
+            // Android saves the credential before making authenticated requests with it.
+            awaitingConfirmation = null
+            mutableConfirmedPairing.value = session
         }
+        return session
     }
 
     fun acceptsAuthorization(authorization: String?): Boolean = authorizedSession(authorization) != null
@@ -79,6 +94,8 @@ internal class DesktopPairingSession(
         store?.write(null)
         mutableInvitation.value = null
         credentialDigest = null
+        awaitingConfirmation = null
+        mutableConfirmedPairing.value = null
         mutableSession.value = null
     }
 

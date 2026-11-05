@@ -50,6 +50,9 @@
     <string name="paired_phone">手机配对记录</string>
     <string name="paired_phone_detail">这台电脑保存了一条手机配对记录。</string>
     <string name="pairing_again">重新配对</string>
+    <string name="pairing_success">手机配对成功</string>
+    <string name="pairing_success_detail">现在可以在手机和电脑之间收发文字和文件。</string>
+    <string name="pairing_done">完成</string>
     <string name="pairing_replacement_hint">扫码配对成功后会替换原配对。</string>
     <string name="connect_computer">连接电脑</string>
     <string name="device_connected">已连接</string>

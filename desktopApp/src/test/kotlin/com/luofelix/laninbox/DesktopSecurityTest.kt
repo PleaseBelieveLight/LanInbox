@@ -11,6 +11,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.Assume.assumeTrue
 
@@ -45,6 +46,7 @@ class DesktopSecurityTest {
             val restored = DesktopPairingSession(store = WindowsPairingVerifierStore(files))
             restored.restore()
             assertTrue(restored.acceptsAuthorization("Bearer $credential"))
+            assertNull(restored.confirmedPairing.value)
             restored.revoke()
             val afterRevoke = DesktopPairingSession(store = WindowsPairingVerifierStore(files))
             afterRevoke.restore()
