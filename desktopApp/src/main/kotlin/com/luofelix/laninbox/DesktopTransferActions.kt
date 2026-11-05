@@ -1,6 +1,7 @@
 package com.luofelix.laninbox
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,6 +11,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -22,10 +24,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposeWindow
+import androidx.compose.ui.draganddrop.awtTransferable
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.dp
@@ -156,6 +161,7 @@ internal class DesktopTransferState(
 }
 
 @Composable
+@OptIn(ExperimentalComposeUiApi::class)
 internal fun DesktopSendComposer(
     window: ComposeWindow,
     receiverReady: Boolean,
@@ -173,6 +179,12 @@ internal fun DesktopSendComposer(
     val attachment = active?.delivery?.attachment
     val preparation = state.preparation
     val busy = active != null || preparation == TransferStatus.Preparing || state.completing(delivered)
+    val enabled = !busy && !choosingFile
+    val dropEnabled = rememberUpdatedState(enabled)
+    val dropTarget = remember(state, logger) {
+        DesktopFileDropTarget({ dropEnabled.value }, state::selectFile, logger)
+    }
+    val hovered = dropTarget.hovered && enabled
     val source = state.file
     val size by produceState<Long?>(null, source) {
         value = source?.let { path ->
@@ -198,6 +210,7 @@ internal fun DesktopSendComposer(
         file = source?.let { SelectedFile(it.fileName.toString(), size) },
         onChoose = {
             if (!choosingFile) scope.launch {
+                dropTarget.clearError()
                 choosingFile = true
                 try {
                     chooseDesktopPath(window, FileDialog.LOAD, logger)?.let(state::selectFile)
@@ -206,12 +219,36 @@ internal fun DesktopSendComposer(
                 }
             }
         },
-        onRemove = { state.selectFile(null) },
+        onRemove = {
+            dropTarget.clearError()
+            state.selectFile(null)
+        },
         onSubmit = if (receiverReady && paired) state::send else onConnect,
         connectRequired = !receiverReady || !paired,
-        enabled = !busy && !choosingFile,
+        modifier = Modifier.dragAndDropTarget(
+            shouldStartDragAndDrop = { dropTarget.accepts(it.awtTransferable, it.action) },
+            target = dropTarget,
+        ),
+        enabled = enabled,
         failed = preparation == TransferStatus.Failed,
+        highlighted = hovered,
     ) {
+        Text(
+            stringResource(
+                when {
+                    hovered -> Res.string.attachment_drop_here
+                    dropTarget.error == FileDropError.SingleFileRequired -> Res.string.attachment_drop_single
+                    dropTarget.error == FileDropError.UnreadableFile -> Res.string.attachment_drop_unreadable
+                    else -> Res.string.attachment_drop_hint
+                },
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (!hovered && dropTarget.error != null) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
         val status = when {
             active != null && !active.offered -> TransferStatus.Waiting
             active != null -> TransferStatus.Sending

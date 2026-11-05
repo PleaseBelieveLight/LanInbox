@@ -24,6 +24,10 @@
     <string name="attachment_failed">传输失败，可以重试。</string>
     <string name="attachment_canceled">已取消传输。</string>
     <string name="attachment_choose">选文件</string>
+    <string name="attachment_drop_hint">也可以将单个文件拖到这里</string>
+    <string name="attachment_drop_here">松开以添加文件</string>
+    <string name="attachment_drop_single">请一次拖入一个文件。</string>
+    <string name="attachment_drop_unreadable">请选择可读取的文件，不支持文件夹。</string>
     <string name="attachment_pick_image">图片</string>
     <string name="attachment_pick_document">文档</string>
     <string name="attachment_pick_file">文件</string>

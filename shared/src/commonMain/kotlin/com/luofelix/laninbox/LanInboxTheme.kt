@@ -1,6 +1,7 @@
 package com.luofelix.laninbox
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -37,10 +38,13 @@ private val darkColors = darkColorScheme(
     outlineVariant = Color(0xFF455365),
 )
 
+/** Returns the shared palette for Compose content and platform window decorations. */
+fun lanInboxColorScheme(darkTheme: Boolean): ColorScheme = if (darkTheme) darkColors else lightColors
+
 @Composable
 internal fun LanInboxTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) darkColors else lightColors,
+        colorScheme = lanInboxColorScheme(isSystemInDarkTheme()),
         content = content,
     )
 }

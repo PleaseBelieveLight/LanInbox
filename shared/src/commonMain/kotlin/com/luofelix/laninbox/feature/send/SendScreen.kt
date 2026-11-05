@@ -51,16 +51,22 @@ fun SendComposer(
     onRemove: () -> Unit,
     onSubmit: () -> Unit,
     connectRequired: Boolean,
+    modifier: Modifier = Modifier,
     enabled: Boolean = true,
     failed: Boolean = false,
+    highlighted: Boolean = false,
     status: @Composable () -> Unit = {},
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val tooLong = remember(draft) { draft.encodeToByteArray().size > MAX_MESSAGE_BYTES }
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = if (highlighted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            if (highlighted) 2.dp else 1.dp,
+            if (highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
     ) {
         Column(
             modifier = Modifier.padding(12.dp),

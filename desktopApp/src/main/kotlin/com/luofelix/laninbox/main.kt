@@ -167,10 +167,11 @@ fun main() = application {
     }
     Window(
         onCloseRequest = ::exitApplication,
-        title = stringResource(Res.string.app_name),
+        title = if (windows) "" else stringResource(Res.string.app_name),
         icon = painterResource(DesktopRes.drawable.laninbox_windows),
         state = rememberWindowState(width = 900.dp, height = 620.dp),
     ) {
+        DesktopWindowDecorations(window, logger)
         val scope = rememberCoroutineScope()
         val transferState = remember(scope, pairing, outbox) { DesktopTransferState(scope, pairing, outbox) }
         var exportFailed by remember { mutableStateOf(false) }

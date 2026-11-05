@@ -24,6 +24,10 @@
     <string name="attachment_failed">Transfer failed. You can retry.</string>
     <string name="attachment_canceled">Transfer canceled.</string>
     <string name="attachment_choose">Choose file</string>
+    <string name="attachment_drop_hint">Or drag one file here</string>
+    <string name="attachment_drop_here">Drop to attach the file</string>
+    <string name="attachment_drop_single">Drop one file at a time.</string>
+    <string name="attachment_drop_unreadable">Choose a readable file. Folders are not supported.</string>
     <string name="attachment_pick_image">Image</string>
     <string name="attachment_pick_document">Document</string>
     <string name="attachment_pick_file">File</string>
