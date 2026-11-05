@@ -47,8 +47,10 @@
     <string name="transfer_waiting">等待手机接收。请在手机上打开局域网快传。</string>
     <string name="connect_to_send">连接后发送</string>
     <string name="connect_phone">连接手机</string>
-    <string name="paired_phone">手机配对记录</string>
-    <string name="paired_phone_detail">这台电脑保存了一条手机配对记录。</string>
+    <string name="paired_phone">手机 · 未连接</string>
+    <string name="paired_phone_detail">手机已配对，请在手机上打开局域网快传以连接。</string>
+    <string name="connected_phone">手机 · 已连接</string>
+    <string name="connected_phone_detail">手机已连接，可以在两台设备之间收发文字和文件。</string>
     <string name="pairing_again">重新配对</string>
     <string name="pairing_success">手机配对成功</string>
     <string name="pairing_success_detail">现在可以在手机和电脑之间收发文字和文件。</string>

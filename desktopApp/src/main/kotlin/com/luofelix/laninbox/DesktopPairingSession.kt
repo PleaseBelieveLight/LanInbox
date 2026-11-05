@@ -6,6 +6,8 @@ import java.util.Base64
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 /** Holds one short-lived invitation and one revocable pairing verifier. */
@@ -21,6 +23,11 @@ internal class DesktopPairingSession(
     private var generation = 0L
     private val mutableSession = MutableStateFlow<Long?>(null)
     val activeSession = mutableSession.asStateFlow()
+    private var lastContact: TimeMark? = null
+    private val mutableConnectedSession = MutableStateFlow<Long?>(null)
+
+    /** The pairing with recent authenticated activity, independent of its saved credential. */
+    val connectedSession = mutableConnectedSession.asStateFlow()
     private var awaitingConfirmation: Long? = null
     private val mutableConfirmedPairing = MutableStateFlow<Long?>(null)
 
@@ -31,6 +38,7 @@ internal class DesktopPairingSession(
     fun restore() {
         val saved = store?.read() ?: return
         credentialDigest = saved
+        clearConnection()
         awaitingConfirmation = null
         mutableConfirmedPairing.value = null
         mutableSession.value = ++generation
@@ -64,6 +72,7 @@ internal class DesktopPairingSession(
         val verifier = digest(credential)
         store?.write(verifier)
         credentialDigest = verifier
+        clearConnection()
         val session = ++generation
         awaitingConfirmation = session
         mutableConfirmedPairing.value = null
@@ -79,6 +88,9 @@ internal class DesktopPairingSession(
         val credential = authorization.substring(7)
         if (credential.length != 43 || !MessageDigest.isEqual(expected, digest(credential))) return null
         val session = mutableSession.value ?: return null
+        // Android polls the outbox in the foreground; a saved verifier alone is not presence.
+        lastContact = clock.markNow()
+        mutableConnectedSession.value = session
         if (awaitingConfirmation == session) {
             // Android saves the credential before making authenticated requests with it.
             awaitingConfirmation = null
@@ -89,14 +101,26 @@ internal class DesktopPairingSession(
 
     fun acceptsAuthorization(authorization: String?): Boolean = authorizedSession(authorization) != null
 
+    /** Marks an idle phone disconnected without invalidating its pairing or pending deliveries. */
+    @Synchronized
+    fun expireConnection() {
+        if (lastContact?.elapsedNow()?.let { it >= CONNECTION_TIMEOUT } == true) clearConnection()
+    }
+
     @Synchronized
     fun revoke() {
         store?.write(null)
         mutableInvitation.value = null
         credentialDigest = null
+        clearConnection()
         awaitingConfirmation = null
         mutableConfirmedPairing.value = null
         mutableSession.value = null
+    }
+
+    private fun clearConnection() {
+        lastContact = null
+        mutableConnectedSession.value = null
     }
 
     private fun newSecret(): String =
@@ -107,5 +131,6 @@ internal class DesktopPairingSession(
 
     companion object {
         val INVITATION_LIFETIME = 2.minutes
+        val CONNECTION_TIMEOUT = 15.seconds
     }
 }

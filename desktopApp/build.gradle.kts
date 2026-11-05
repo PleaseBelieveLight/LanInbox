@@ -6,6 +6,13 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
+val nativeAccessArgument = "--enable-native-access=ALL-UNNAMED"
+
+// IDE-injected Hot Reload tasks launch a separate application JVM.
+tasks.withType<JavaExec>().configureEach {
+    jvmArgs(nativeAccessArgument)
+}
+
 dependencies {
     implementation(project(":shared"))
 
@@ -22,6 +29,8 @@ dependencies {
     implementation(libs.jmdns)
     implementation(libs.zxing.core)
     implementation(libs.jna.platform)
+    // Application diagnostics are emitted through AppLogger.
+    runtimeOnly(libs.slf4j.nop)
     testImplementation(libs.kotlin.testJunit)
     testImplementation(libs.ktor.server.test)
 }
@@ -29,6 +38,7 @@ dependencies {
 compose.desktop {
     application {
         mainClass = "com.luofelix.laninbox.MainKt"
+        jvmArgs += nativeAccessArgument
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)

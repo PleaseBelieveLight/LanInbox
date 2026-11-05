@@ -228,15 +228,17 @@ internal fun DesktopConnection(
     onDeviceName: (String) -> Unit,
 ) {
     val paired = pairedSession != null
+    val connectedSession by pairing.connectedSession.collectAsState()
+    val connected = receiverReady && paired && connectedSession == pairedSession
     val confirmedPairing by pairing.confirmedPairing.collectAsState()
     var acknowledgedPairing by remember(pairing) { mutableStateOf<Long?>(null) }
-    val pairingSucceeded = confirmedPairing != null && confirmedPairing == pairedSession &&
+    val pairingSucceeded = connected && confirmedPairing != null && confirmedPairing == pairedSession &&
         confirmedPairing != acknowledgedPairing
     OutlinedButton(onClick = onOpen) {
         Text(
             stringResource(
                 when {
-                    pairingSucceeded -> Res.string.pairing_success
+                    connected -> Res.string.connected_phone
                     paired -> Res.string.paired_phone
                     else -> Res.string.connect_phone
                 },
@@ -273,7 +275,14 @@ internal fun DesktopConnection(
     }
     AlertDialog(
         onDismissRequest = ::closeConnection,
-        title = { Text(stringResource(if (pairingSucceeded) Res.string.pairing_success else Res.string.connect_phone)) },
+        title = {
+            Text(stringResource(when {
+                pairingSucceeded -> Res.string.pairing_success
+                connected -> Res.string.connected_phone
+                paired -> Res.string.paired_phone
+                else -> Res.string.connect_phone
+            }))
+        },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -283,7 +292,7 @@ internal fun DesktopConnection(
                 when {
                     pairingSucceeded -> Text(stringResource(Res.string.pairing_success_detail))
                     paired && !replacingPairing -> {
-                        Text(stringResource(Res.string.paired_phone_detail))
+                        Text(stringResource(if (connected) Res.string.connected_phone_detail else Res.string.paired_phone_detail))
                         Button(
                             enabled = receiverReady && address != null,
                             onClick = {

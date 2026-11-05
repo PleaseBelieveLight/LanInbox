@@ -30,6 +30,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withContext
@@ -40,6 +41,7 @@ import laninbox.shared.generated.resources.app_name
 import laninbox.shared.generated.resources.receiver_failed
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Duration.Companion.seconds
 
 private val logger = AppLogger { event -> println("[${event.level.name.uppercase()}] LanInbox: ${event.render()}") }
 
@@ -73,6 +75,13 @@ fun main() = application {
     DisposableEffect(Unit) {
         logger.info("Desktop application started")
         onDispose { logger.info("Desktop application stopped") }
+    }
+    LaunchedEffect(pairing) {
+        // Presence belongs to the receiver application, so closing a dialog cannot stop expiry.
+        while (true) {
+            delay(1.seconds)
+            pairing.expireConnection()
+        }
     }
     LaunchedEffect(outbox, pairing) {
         combine(pairing.activeSession, outbox.delivery) { session, delivery -> session to delivery }

@@ -22,6 +22,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class PairingRoutesTest {
@@ -49,11 +51,62 @@ class PairingRoutesTest {
         }.status
 
         assertNull(session.confirmedPairing.value)
+        assertNull(session.connectedSession.value)
         assertEquals(HttpStatusCode.NoContent, verify())
         assertEquals(assertNotNull(session.activeSession.value), session.confirmedPairing.value)
+        assertEquals(session.activeSession.value, session.connectedSession.value)
         session.revoke()
         assertNull(session.confirmedPairing.value)
+        assertNull(session.connectedSession.value)
         assertEquals(HttpStatusCode.Unauthorized, verify())
+    }
+
+    @Test
+    fun foregroundOutboxPollConnectsAndReconnectsAnIdlePhone() = testApplication {
+        val clock = TestTimeSource()
+        val session = DesktopPairingSession(clock)
+        val outbox = DesktopOutbox()
+        application { routing { outboxRoutes(session, outbox) } }
+        session.issueInvitation()
+        val credential = assertNotNull(session.redeem(assertNotNull(session.invitation.value)))
+        val owner = assertNotNull(session.activeSession.value)
+        assertNull(session.connectedSession.value)
+
+        suspend fun poll() = client.get("/v1/outbox") {
+            header(HttpHeaders.Authorization, "Bearer $credential")
+        }.status
+
+        assertEquals(HttpStatusCode.NoContent, poll())
+        assertEquals(owner, session.connectedSession.value)
+        clock += 1_500.milliseconds
+        assertEquals(HttpStatusCode.NoContent, poll())
+        clock += 14_999.milliseconds
+        session.expireConnection()
+        assertEquals(owner, session.connectedSession.value)
+        clock += 1.milliseconds
+        session.expireConnection()
+        assertNull(session.connectedSession.value)
+        assertEquals(owner, session.activeSession.value)
+        assertEquals(HttpStatusCode.NoContent, poll())
+        assertEquals(owner, session.connectedSession.value)
+    }
+
+    @Test
+    fun invalidAuthorizationDoesNotConnectOrKeepThePhoneOnline() {
+        val clock = TestTimeSource()
+        val session = DesktopPairingSession(clock)
+        session.issueInvitation()
+        val credential = assertNotNull(session.redeem(assertNotNull(session.invitation.value)))
+        assertNull(session.authorizedSession(null))
+        assertNull(session.authorizedSession("Bearer ${"x".repeat(43)}"))
+        assertNull(session.connectedSession.value)
+        val owner = assertNotNull(session.authorizedSession("Bearer $credential"))
+        clock += 10.seconds
+        assertNull(session.authorizedSession("Bearer ${"x".repeat(43)}"))
+        clock += 5.seconds
+        session.expireConnection()
+        assertNull(session.connectedSession.value)
+        assertEquals(owner, session.activeSession.value)
     }
 
     @Test
@@ -75,8 +128,10 @@ class PairingRoutesTest {
         val original = assertNotNull(session.redeem(assertNotNull(session.invitation.value)))
         val originalAuthorization = "Bearer $original"
         val originalSession = assertNotNull(session.authorizedSession(originalAuthorization))
+        assertEquals(originalSession, session.connectedSession.value)
 
         session.issueInvitation()
+        assertEquals(originalSession, session.connectedSession.value)
         val expired = assertNotNull(session.invitation.value)
         assertEquals(originalSession, session.authorizedSession(originalAuthorization))
         clock += 2.minutes
@@ -85,8 +140,11 @@ class PairingRoutesTest {
 
         session.issueInvitation()
         val replacement = assertNotNull(session.redeem(assertNotNull(session.invitation.value)))
+        assertNull(session.connectedSession.value)
         assertEquals(null, session.authorizedSession(originalAuthorization))
-        assertNotNull(session.authorizedSession("Bearer $replacement"))
+        assertNull(session.connectedSession.value)
+        val replacementSession = assertNotNull(session.authorizedSession("Bearer $replacement"))
+        assertEquals(replacementSession, session.connectedSession.value)
     }
 
     @Test

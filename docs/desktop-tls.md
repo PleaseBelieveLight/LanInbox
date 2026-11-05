@@ -77,6 +77,15 @@ returns HTTP 204. A missing or invalid credential returns HTTP 401. Successful r
 replaces the previous credential. **Forget phone** deletes its verifier.
 Keep the invitation and credential out of URLs, shell history, and logs.
 
+The desktop shows **Phone · Connected** after an authenticated request with the current
+credential. Android's foreground outbox poll runs every 1.5 seconds and refreshes this state;
+pairing redemption and mDNS announcements alone do not establish presence. After 15 seconds
+without authenticated activity, the desktop marks the phone disconnected on its next one-second
+check. Returning to the foreground or reconnecting refreshes presence without pairing again.
+Restoring a saved verifier after desktop startup does not mark the phone connected. Presence
+expiry does not revoke the credential or discard a queued delivery; re-pairing and forgetting
+the phone clear its previous presence immediately.
+
 Run `./gradlew :desktopApp:test --tests '*DesktopIdentityServerTest'` to check trusted TLS,
 rejection of an untrusted certificate, the fingerprint of the handshake key, and route isolation.
 Run `./gradlew :desktopApp:test --tests '*PairingRoutesTest'` to check expiration, concurrent
