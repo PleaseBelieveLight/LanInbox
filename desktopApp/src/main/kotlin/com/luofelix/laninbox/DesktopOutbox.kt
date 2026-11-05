@@ -15,6 +15,7 @@ import java.security.MessageDigest
 import java.util.HexFormat
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,13 +27,14 @@ internal data class QueuedDelivery(
     val delivery: OutboundDelivery,
     val stagedFile: Path? = null,
     val transferred: Long = 0,
+    val offered: Boolean = false,
 )
 
 /** Holds one pending delivery until the paired phone acknowledges local storage. */
 internal class DesktopOutbox {
     private val pending = MutableStateFlow<QueuedDelivery?>(null)
     val delivery = pending.asStateFlow()
-    private val completed = MutableStateFlow(false)
+    private val completed = MutableStateFlow<String?>(null)
     val delivered = completed.asStateFlow()
 
     fun enqueueText(session: Long, content: String, kind: MessageKind): Boolean {
@@ -69,8 +71,10 @@ internal class DesktopOutbox {
                     Files.probeContentType(source) ?: java.net.URLConnection.guessContentTypeFromName(source.fileName.toString()),
                 ),
             )
-            currentCoroutineContext().ensureActive()
-            queued = enqueue(QueuedDelivery(session, OutboundDelivery(id, attachment = attachment), staged))
+            queued = enqueue(
+                QueuedDelivery(session, OutboundDelivery(id, attachment = attachment), staged),
+                currentCoroutineContext()[Job],
+            )
             queued
         } finally {
             if (!queued) delete(staged)
@@ -78,20 +82,30 @@ internal class DesktopOutbox {
     }
 
     @Synchronized
-    private fun enqueue(entry: QueuedDelivery): Boolean {
+    private fun enqueue(entry: QueuedDelivery, staging: Job? = null): Boolean {
+        // Coordinate with cancellation so a finished staging job cannot publish after the outbox was cleared.
+        staging?.ensureActive()
         if (pending.value != null) return false
-        completed.value = false
+        completed.value = null
         pending.value = entry
         return true
     }
 
     fun next(session: Long): QueuedDelivery? = pending.value?.takeIf { it.owner == session }
 
+    /** Records that the paired phone started fetching the pending delivery. */
+    @Synchronized
+    fun offer(session: Long): OutboundDelivery? {
+        val entry = next(session) ?: return null
+        if (!entry.offered) pending.value = entry.copy(offered = true)
+        return entry.delivery
+    }
+
     @Synchronized
     fun acknowledge(session: Long, id: String): Boolean {
         val entry = next(session)?.takeIf { it.delivery.id == id } ?: return false
         pending.value = null
-        completed.value = true
+        completed.value = id
         delete(entry.stagedFile)
         return true
     }
@@ -100,7 +114,7 @@ internal class DesktopOutbox {
     fun cancel() {
         val entry = pending.value
         pending.value = null
-        completed.value = false
+        completed.value = null
         delete(entry?.stagedFile)
     }
 

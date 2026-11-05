@@ -62,4 +62,22 @@ class PairingRoutesTest {
         assertEquals(null, session.redeem(code))
         assertEquals(null, session.invitation.value)
     }
+
+    @Test
+    fun invitationExpiryKeepsARefreshedCode() {
+        val clock = TestTimeSource()
+        val session = DesktopPairingSession(clock)
+        session.issueInvitation()
+        val oldCode = assertNotNull(session.invitation.value)
+        clock += 2.minutes
+        session.issueInvitation()
+        val refreshed = assertNotNull(session.invitation.value)
+        session.expireInvitation(oldCode)
+        assertEquals(refreshed, session.invitation.value)
+        session.expireInvitation(refreshed)
+        assertEquals(refreshed, session.invitation.value)
+        clock += 2.minutes
+        session.expireInvitation(refreshed)
+        assertEquals(null, session.invitation.value)
+    }
 }

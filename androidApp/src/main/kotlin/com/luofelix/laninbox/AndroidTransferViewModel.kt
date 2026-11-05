@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.luofelix.laninbox.core.network.AttachmentInfo
 import com.luofelix.laninbox.core.network.OutboundDelivery
 import com.luofelix.laninbox.core.network.PairedDevice
+import com.luofelix.laninbox.core.network.safeAttachmentName
+import com.luofelix.laninbox.feature.send.SelectedFile
 import com.luofelix.laninbox.feature.send.TransferStatus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -39,14 +41,21 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
     val client = mutableClient.asStateFlow()
     private val pairingState = MutableStateFlow<TransferStatus?>(null)
     val pairing = pairingState.asStateFlow()
+    private val rejectedInvitation = MutableStateFlow(false)
+    val invitationRejected = rejectedInvitation.asStateFlow()
     private val sent = MutableStateFlow(FileTransferState())
     val outgoing = sent.asStateFlow()
+    private val selectedInfo = MutableStateFlow<SelectedFile?>(null)
+    val selectedFile = selectedInfo.asStateFlow()
     private val received = MutableStateFlow(FileTransferState())
     val incoming = received.asStateFlow()
     private val history = MutableStateFlow<List<OutboundDelivery>>(emptyList())
     val inbox = history.asStateFlow()
+    private val inboxFailure = MutableStateFlow(false)
+    val inboxOperationFailed = inboxFailure.asStateFlow()
     private val receptionEnabled = MutableStateFlow(true)
     private var uploadJob: Job? = null
+    private var selectionJob: Job? = null
     private var staged: StagedUpload? = null
     private var selected: Uri? = null
     private var selectedExport: AttachmentInfo? = null
@@ -67,12 +76,16 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
 
     fun pair(address: String, fingerprint: String, invitation: String) {
         if (pairingState.value == TransferStatus.Preparing) return
+        rejectedInvitation.value = false
         pairingState.value = TransferStatus.Preparing
         viewModelScope.launch {
             try {
                 acceptConnection(SecureLanClient.pair(address, fingerprint, invitation))
             } catch (error: CancellationException) {
                 throw error
+            } catch (_: PairingInvitationRejected) {
+                rejectedInvitation.value = true
+                pairingState.value = TransferStatus.Failed
             } catch (error: Exception) {
                 androidLogger.warn("HTTPS pairing failed", "type" to error.javaClass.simpleName)
                 pairingState.value = TransferStatus.Failed
@@ -80,12 +93,11 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
         }
     }
 
-    fun permissionRequired() {
-        pairingState.value = TransferStatus.PermissionRequired
-    }
-
-    fun invalidInvitation() {
-        pairingState.value = TransferStatus.Failed
+    fun clearPairingFeedback() {
+        if (pairingState.value != TransferStatus.Preparing) {
+            rejectedInvitation.value = false
+            pairingState.value = null
+        }
     }
 
     fun discoveryChanged(discovered: List<DiscoveredDesktop>) {
@@ -103,6 +115,7 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
         if (!networkAllowed || client.value != null || pairingState.value == TransferStatus.Preparing) return
         val discovered = devices.value.firstOrNull { it.fingerprint == device.fingerprint }?.address
         val endpoint = address?.takeIf { it.isNotBlank() } ?: discovered ?: device.address
+        rejectedInvitation.value = false
         pairingState.value = TransferStatus.Preparing
         viewModelScope.launch {
             try {
@@ -140,9 +153,6 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
         mutableClient.value = null
         previous?.close()
         cancelUpload()
-        staged?.file?.delete()
-        staged = null
-        selected = null
         mutableRemembered.value = null
         viewModelScope.launch { withContext(Dispatchers.IO) { deviceStore.write(null) } }
         received.value = FileTransferState()
@@ -151,16 +161,38 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
 
     fun choose(uri: Uri) {
         if (uploadJob?.isActive == true) return
+        selectionJob?.cancel()
         selected = uri
+        selectedInfo.value = null
         staged?.file?.delete()
         staged = null
-        retryUpload()
+        sent.value = FileTransferState(TransferStatus.Preparing)
+        selectionJob = viewModelScope.launch {
+            selectedInfo.value = try {
+                files.describe(uri)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                SelectedFile(safeAttachmentName(uri.lastPathSegment.orEmpty()))
+            }
+            sent.value = FileTransferState()
+        }
+    }
+
+    fun removeSelection() {
+        if (uploadJob?.isActive == true) return
+        selectionJob?.cancel()
+        staged?.file?.delete()
+        staged = null
+        selected = null
+        selectedInfo.value = null
+        sent.value = FileTransferState()
     }
 
     fun retryUpload() {
         val connection = client.value ?: return
         val uri = selected ?: return
-        if (uploadJob?.isActive == true) return
+        if (uploadJob?.isActive == true || selectionJob?.isActive == true) return
         sent.value = FileTransferState(TransferStatus.Preparing)
         uploadJob = viewModelScope.launch {
             try {
@@ -175,6 +207,7 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
                 file.file.delete()
                 staged = null
                 selected = null
+                selectedInfo.value = null
             } catch (error: CancellationException) {
                 sent.update { it.copy(status = TransferStatus.Canceled) }
                 throw error
@@ -188,6 +221,10 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
     }
 
     fun cancelUpload() {
+        if (selectionJob?.isActive == true) {
+            removeSelection()
+            sent.value = FileTransferState(TransferStatus.Canceled)
+        }
         uploadJob?.cancel()
     }
 
@@ -266,12 +303,13 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
 
     fun deleteHistory(id: String?) {
         viewModelScope.launch {
+            inboxFailure.value = false
             try {
                 files.delete(id)
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                received.update { it.copy(status = TransferStatus.Failed) }
+                inboxFailure.value = true
             }
             history.value = files.recent()
         }
@@ -282,12 +320,13 @@ internal class AndroidTransferViewModel(application: Application) : AndroidViewM
         selectedExport = null
         if (attachment == null || uri == null) return
         viewModelScope.launch {
+            inboxFailure.value = false
             try {
                 files.export(attachment, uri)
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                received.update { it.copy(status = TransferStatus.Failed) }
+                inboxFailure.value = true
             }
         }
     }

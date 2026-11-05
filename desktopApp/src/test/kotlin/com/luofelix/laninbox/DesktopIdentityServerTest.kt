@@ -198,7 +198,10 @@ class DesktopIdentityServerTest {
                         assertNull(androidClient.next())
                         val sharedOwner = assertNotNull(pairing.activeSession.value)
                         assertTrue(outbox.enqueueFile(sharedOwner, outgoing))
+                        assertEquals(false, assertNotNull(outbox.delivery.value).offered)
+                        assertNull(outbox.delivered.value)
                         val sharedDelivery = assertNotNull(androidClient.next())
+                        assertTrue(assertNotNull(outbox.delivery.value).offered)
                         val sharedAttachment = assertNotNull(sharedDelivery.attachment)
                         val phoneFile = directory.resolve("phone-download")
                         assertFailsWith<IOException> {
@@ -210,6 +213,7 @@ class DesktopIdentityServerTest {
                         androidClient.download(sharedAttachment, phoneFile.toFile()) {}
                         assertContentEquals(imageBytes, Files.readAllBytes(phoneFile))
                         androidClient.acknowledge(sharedDelivery.id)
+                        assertEquals(sharedDelivery.id, outbox.delivered.value)
                         assertNull(androidClient.next())
                         androidClient.upload(sharedAttachment, phoneFile.toFile()) {}
                         assertEquals("photo.png", attachments.attachments.value.first().name)

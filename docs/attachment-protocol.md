@@ -48,5 +48,7 @@ verifies its length and SHA-256. After saving a text or verified file, it calls
 retry starts from byte zero. The phone retains received items by delivery ID, so a retry after
 an acknowledgment loss does not create another inbox entry.
 
-Both apps show byte progress for file transfers. Canceling a download on Android pauses polling
-until the user taps **Retry**. Canceling a queued transfer on Windows removes that delivery.
+Windows shows that a delivery is waiting until the phone polls for it, then shows file progress
+while the phone downloads. It reports delivery after the phone acknowledges local storage.
+Canceling a download on Android pauses polling until the user taps **Retry**. Canceling a queued
+transfer on Windows removes that delivery.

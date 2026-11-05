@@ -18,6 +18,7 @@ dependencies {
 
     implementation(libs.compose.uiToolingPreview)
     implementation(libs.compose.ui)
+    implementation(libs.compose.components.resources)
     implementation(libs.ktor.client.core)
     implementation(libs.okhttp)
     implementation(libs.serialization.json)

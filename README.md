@@ -28,23 +28,23 @@ Android and the MSI on Windows, or follow the build instructions below.
 ### Send your first link
 
 1. Connect the phone and PC to the same local network and open LanInbox on both.
-2. On Windows, choose **Create pairing invitation**. On Android, tap **Scan pairing QR code**
+2. On Windows, choose **Connect phone** to show a QR code. On Android, tap **Scan to connect**
    and scan the code on your PC.
-3. On Android, paste `https://example.com` into the send form and tap **Send**. Open the Windows
-   **Inbox** to copy the link.
+3. On Android, paste `https://example.com` into the send area and tap **Send**. Copy the link
+   from the Windows **Inbox**.
 
-After pairing, use **Choose file or image** at the top of Android’s **Send** tab or the Windows
-**Inbox**. Selecting a file starts the transfer. When sending to the phone, keep LanInbox in the
-foreground on Android until the file appears in its inbox.
+After pairing, choose **Choose file** in the send area on either device. Review the selected
+file and tap **Send**. When sending to the phone, keep LanInbox in the foreground on Android
+until the file appears in its inbox.
 
 ### Connection troubleshooting
 
-- **Pair manually.** Enter the LAN address, certificate fingerprint, and pairing invitation
-  shown on Windows into the Android app.
+- **Pair manually.** Open **Connection details** on Windows and enter the LAN address,
+  certificate fingerprint, and pairing invitation under **Connect manually** on Android.
 - **Check local network access.** Grant permission on Android when prompted and allow LanInbox
   through Windows Firewall on private networks.
-- **Reconnect after an IP change.** If discovery fails, enter the PC’s current LAN address and
-  tap **Reconnect to paired computer**.
+- **Reconnect after an IP change.** If discovery fails, open **Connect manually**, enter
+  the PC’s current LAN address, and tap **Reconnect to paired computer**.
 
 ## Project structure
 

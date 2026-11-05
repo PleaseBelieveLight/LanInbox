@@ -35,11 +35,18 @@ internal class DesktopPairingSession(
         mutableInvitation.value = newSecret()
     }
 
+    @Synchronized
+    fun expireInvitation(code: String) {
+        if (mutableInvitation.value == code && issuedAt.elapsedNow() >= INVITATION_LIFETIME) {
+            mutableInvitation.value = null
+        }
+    }
+
     /** Returns a fresh credential only once for a valid invitation. */
     @Synchronized
     fun redeem(code: String): String? {
         val active = mutableInvitation.value ?: return null
-        if (issuedAt.elapsedNow() >= 2.minutes) {
+        if (issuedAt.elapsedNow() >= INVITATION_LIFETIME) {
             mutableInvitation.value = null
             return null
         }
@@ -80,4 +87,8 @@ internal class DesktopPairingSession(
 
     private fun digest(secret: String): ByteArray =
         MessageDigest.getInstance("SHA-256").digest(secret.encodeToByteArray())
+
+    companion object {
+        val INVITATION_LIFETIME = 2.minutes
+    }
 }

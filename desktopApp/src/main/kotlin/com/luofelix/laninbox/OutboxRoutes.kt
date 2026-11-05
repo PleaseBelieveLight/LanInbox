@@ -18,7 +18,7 @@ internal fun Route.outboxRoutes(pairing: DesktopPairingSession, outbox: DesktopO
     val downloads = Semaphore(1)
     get("/v1/outbox") {
         val session = call.requireSession(pairing) ?: return@get
-        val delivery = outbox.next(session)?.delivery
+        val delivery = outbox.offer(session)
         if (delivery == null) call.respond(HttpStatusCode.NoContent)
         else call.respondText(MessageJson.encodeToString(delivery), ContentType.Application.Json)
     }

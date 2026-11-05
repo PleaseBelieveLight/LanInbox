@@ -50,8 +50,9 @@ authenticated text and attachment transfers in both directions.
 1. Launch the Windows app in its default mode. Use the same LAN on both devices. Windows may
    prompt for access on the private network profile. TCP 8443 carries transfers and UDP 5353
    carries discovery.
-2. Select **Create pairing invitation** on Windows. Scan the QR in LanInbox on Android or enter
-   the displayed address, fingerprint, and invitation. Grant local network access if prompted.
+2. Select **Connect phone** on Windows, then **Scan to connect** on Android. For manual pairing,
+   find the address, fingerprint, and invitation under **Connection details** on Windows.
+   Grant local network access if prompted.
 3. Send a text, link, code snippet, file, or image from either app. Keep Android in the foreground
    when receiving. Both inboxes support saving files and previewing supported images.
 
@@ -64,7 +65,7 @@ on desktop shutdown.
 
 ## Exercise local pairing
 
-Select **Create pairing invitation** in the desktop window. Send the displayed code as
+Select **Connect phone**, then **Connection details** in the desktop window. Send the displayed code as
 `{"code":"<invitation>"}` in a JSON body to `POST /v1/pairing` over the trusted TLS connection.
 The code expires after two minutes and can be redeemed once. Creating another invitation
 invalidates the previous one. A failed or replayed redemption returns HTTP 400 with
@@ -73,7 +74,7 @@ invalidates the previous one. A failed or replayed redemption returns HTTP 400 w
 Successful redemption returns HTTP 200 and a JSON `credential`. Send it in the
 `Authorization: Bearer <credential>` header to `GET /v1/pairing/session`. A valid credential
 returns HTTP 204. A missing or invalid credential returns HTTP 401. Successful re-pairing
-replaces the previous credential. **Clear invitation and revoke session** deletes its verifier.
+replaces the previous credential. **Forget phone** deletes its verifier.
 Keep the invitation and credential out of URLs, shell history, and logs.
 
 Run `./gradlew :desktopApp:test --tests '*DesktopIdentityServerTest'` to check trusted TLS,

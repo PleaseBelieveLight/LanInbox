@@ -49,6 +49,7 @@ private val json = "application/json".toMediaType()
 private val binary = "application/octet-stream".toMediaType()
 
 class SessionExpired : IOException("Pairing session expired")
+class PairingInvitationRejected : IOException("Pairing invitation rejected")
 
 class SecureLanClient private constructor(
     val address: String,
@@ -166,15 +167,22 @@ class SecureLanClient private constructor(
             val pin = fingerprint.trim()
             val client = pinnedHttpClient(pin)
             val payload = buildJsonObject { put("code", invitation.trim()) }.toString()
-            val credential = client.exchange(
-                Request.Builder().url("https://$endpoint/v1/pairing").post(payload.toRequestBody(json)),
-            ) { response ->
-                response.requireSuccess()
-                MessageJson.parseToJsonElement(response.readJson()).jsonObject["credential"]
-                    ?.jsonPrimitive?.content?.takeIf(::isPairingSecret)
-                    ?: throw IOException("Invalid pairing response")
+            try {
+                val credential = client.exchange(
+                    Request.Builder().url("https://$endpoint/v1/pairing").post(payload.toRequestBody(json)),
+                ) { response ->
+                    if (response.code == 400) throw PairingInvitationRejected()
+                    response.requireSuccess()
+                    MessageJson.parseToJsonElement(response.readJson()).jsonObject["credential"]
+                        ?.jsonPrimitive?.content?.takeIf(::isPairingSecret)
+                        ?: throw IOException("Invalid pairing response")
+                }
+                return SecureLanClient(endpoint, client, PairedDevice(endpoint, pin, credential))
+            } catch (error: Exception) {
+                client.dispatcher.cancelAll()
+                client.connectionPool.evictAll()
+                throw error
             }
-            return SecureLanClient(endpoint, client, PairedDevice(endpoint, pin, credential))
         }
 
         suspend fun reconnect(device: PairedDevice, address: String = device.address): SecureLanClient {

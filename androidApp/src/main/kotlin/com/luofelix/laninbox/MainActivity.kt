@@ -1,46 +1,72 @@
 package com.luofelix.laninbox
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
+import android.view.View
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.google.zxing.BarcodeFormat
+import com.journeyapps.barcodescanner.CameraPreview
+import com.journeyapps.barcodescanner.DecoratedBarcodeView
+import com.journeyapps.barcodescanner.DefaultDecoderFactory
 import com.luofelix.laninbox.core.network.AttachmentInfo
 import com.luofelix.laninbox.core.network.PairingInvitation
 import com.luofelix.laninbox.feature.inbox.InboxMessage
-import com.luofelix.laninbox.feature.inbox.ReceiverStatus
+import com.luofelix.laninbox.feature.inbox.InboxOperationError
+import com.luofelix.laninbox.feature.send.ClientSendComposer
 import com.luofelix.laninbox.feature.send.DeliveryResult
 import com.luofelix.laninbox.feature.send.DevelopmentMessageSender
 import com.luofelix.laninbox.feature.send.MessageSender
-import com.luofelix.laninbox.feature.send.SecurePairingForm
-import com.luofelix.laninbox.feature.send.TransferControls
+import com.luofelix.laninbox.feature.send.TransferFeedback
 import com.luofelix.laninbox.feature.send.TransferStatus
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import laninbox.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 class MainActivity : ComponentActivity() {
     private val discoveryEnabled = MutableStateFlow(false)
+    private val cameraAllowed = MutableStateFlow(false)
+    private var networkRequested = false
     private val localNetworkPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { allowed ->
         discoveryEnabled.value = allowed
         transfers.networkPermissionChanged(allowed)
     }
+    private val cameraPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { allowed -> cameraAllowed.value = allowed }
     private var developmentSender: DevelopmentMessageSender? = null
     private val transfers by viewModels<AndroidTransferViewModel>()
     private val chooseFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) {
@@ -49,47 +75,27 @@ class MainActivity : ComponentActivity() {
     private val saveFile = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) {
         transfers.completeExport(it)
     }
-    private val scanQr = registerForActivityResult(ScanContract()) { result ->
-        val contents = result.contents ?: return@registerForActivityResult
-        val invitation = PairingInvitation.decode(contents)
-        if (invitation == null) {
-            transfers.invalidInvitation()
-        } else if (canAccessLan()) {
-            transfers.pair(invitation.address, invitation.fingerprint, invitation.code)
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) {
-            androidLogger.info("Android activity started")
-        }
+        if (savedInstanceState == null) androidLogger.info("Android activity started")
+        networkRequested = savedInstanceState?.getBoolean("networkRequested") ?: false
 
-        // Match the debug manifest's cleartext policy when wiring the development sender.
-        val developmentMode = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
-        val sender = if (developmentMode) {
+        // The debug-only sender follows the cleartext policy in the debug manifest.
+        val development = if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
             val client = DevelopmentMessageSender()
             developmentSender = client
             MessageSender { address, message ->
-                if (!canAccessLan()) {
-                    // Leave the draft pending so the user can retry after granting access.
-                    DeliveryResult.PermissionRequired
-                } else {
-                    client.send(address, message)
-                }
+                if (hasLanPermission()) client.send(address, message)
+                else DeliveryResult.PermissionRequired
             }
-        } else {
-            null
-        }
+        } else null
         val senderId = AndroidSettings(applicationContext).senderId()
-        val initialDraft = if (intent.action == Intent.ACTION_SEND &&
-            intent.type == "text/plain"
-        ) {
+        val initialDraft = if (intent.action == Intent.ACTION_SEND && intent.type == "text/plain") {
             intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty()
-        } else {
-            ""
-        }
+        } else ""
+
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 launch { transfers.receiveInForeground() }
@@ -101,73 +107,216 @@ class MainActivity : ComponentActivity() {
             }
         }
         setContent {
-            val connected by transfers.client.collectAsStateWithLifecycle()
-            val pairing by transfers.pairing.collectAsStateWithLifecycle()
-            val devices by transfers.devices.collectAsStateWithLifecycle()
-            val remembered by transfers.remembered.collectAsStateWithLifecycle()
-            val outgoing by transfers.outgoing.collectAsStateWithLifecycle()
-            val incoming by transfers.incoming.collectAsStateWithLifecycle()
-            val inbox by transfers.inbox.collectAsStateWithLifecycle()
-            App(
-                sender = connected?.let { connection -> MessageSender { _, message -> connection.sendMessage(message) } }
-                    ?: sender,
-                senderId = senderId,
-                initialDraft = initialDraft,
-                pairedAddress = connected?.address,
-                receiverStatus = if (connected == null) ReceiverStatus.Disabled else ReceiverStatus.Foreground,
-                messages = inbox.mapNotNull { it.message?.let(::InboxMessage) },
-                attachments = inbox.mapNotNull { it.attachment },
-                previewAttachment = transfers.files::preview,
-                exportAttachment = ::exportAttachment,
-                deleteMessage = { transfers.deleteHistory(it.request.messageId) },
-                deleteAttachment = { transfers.deleteHistory(it.id) },
-                clearHistory = { transfers.deleteHistory(null) },
-                sendActions = {
-                    val busy = outgoing.status == TransferStatus.Preparing || outgoing.status == TransferStatus.Sending
-                    TransferControls(
-                        outgoing.status, outgoing.progress, outgoing.name,
-                        choose = { chooseFile.launch(arrayOf("*/*")) },
-                        chooseEnabled = !busy,
-                        pairingRequired = connected == null,
-                        cancel = if (busy) transfers::cancelUpload else null,
-                        retry = if (connected != null &&
-                            (outgoing.status == TransferStatus.Failed || outgoing.status == TransferStatus.Canceled)
-                        ) transfers::retryUpload else null,
-                    )
-                    SecurePairingForm(
-                        connected = connected != null,
-                        busy = pairing == TransferStatus.Preparing,
-                        failed = pairing == TransferStatus.Failed,
-                        onPair = { address, fingerprint, invitation ->
-                            if (canAccessLan()) transfers.pair(address, fingerprint, invitation)
-                            else transfers.permissionRequired()
-                        },
-                        onDisconnect = transfers::disconnect,
-                        devices = devices.map { it.name to it.address },
-                        remembered = remembered != null,
-                        onDiscover = { if (canAccessLan()) discoveryEnabled.value = true },
-                        onScan = {
-                            if (canAccessLan()) {
-                                scanQr.launch(ScanOptions()
-                                    .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                                    .setPrompt(getString(R.string.pairing_scanner_prompt))
-                                    .setBeepEnabled(false))
-                            }
-                        },
-                        onReconnect = { if (canAccessLan()) transfers.reconnectSaved(it) },
-                    )
-                    if (pairing == TransferStatus.PermissionRequired) TransferControls(pairing)
-                },
-                inboxActions = {
-                    val paused = incoming.status == TransferStatus.Canceled || incoming.status == TransferStatus.Failed
-                    TransferControls(
-                        incoming.status, incoming.progress, incoming.name,
-                        cancel = if (connected != null && incoming.status == TransferStatus.Receiving)
-                            transfers::pauseReception else null,
-                        retry = if (connected != null && paused) transfers::retryReception else null,
-                    )
-                },
+            Home(senderId, initialDraft, development)
+        }
+    }
+
+    @Composable
+    private fun Home(senderId: String, initialDraft: String, development: MessageSender?) {
+        val connected by transfers.client.collectAsStateWithLifecycle()
+        val pairing by transfers.pairing.collectAsStateWithLifecycle()
+        val invitationRejected by transfers.invitationRejected.collectAsStateWithLifecycle()
+        val devices by transfers.devices.collectAsStateWithLifecycle()
+        val remembered by transfers.remembered.collectAsStateWithLifecycle()
+        val authorized by discoveryEnabled.collectAsStateWithLifecycle()
+        val selectedFile by transfers.selectedFile.collectAsStateWithLifecycle()
+        val outgoing by transfers.outgoing.collectAsStateWithLifecycle()
+        val incoming by transfers.incoming.collectAsStateWithLifecycle()
+        val inbox by transfers.inbox.collectAsStateWithLifecycle()
+        val inboxFailure by transfers.inboxOperationFailed.collectAsStateWithLifecycle()
+        var showConnection by rememberSaveable { mutableStateOf(false) }
+        var scanning by rememberSaveable { mutableStateOf(false) }
+        var developmentAddress by rememberSaveable { mutableStateOf<String?>(null) }
+
+        fun beginScan() {
+            transfers.clearPairingFeedback()
+            showConnection = false
+            scanning = true
+        }
+        fun connect() {
+            if (authorized && remembered == null && connected == null && pairing != TransferStatus.Preparing) beginScan()
+            else showConnection = true
+        }
+
+        if (scanning && connected == null) {
+            ScanPage(
+                busy = pairing == TransferStatus.Preparing,
+                failed = pairing == TransferStatus.Failed,
+                invitationRejected = invitationRejected,
+                authorized = authorized,
+                onBack = { scanning = false },
+                onDetails = { scanning = false; showConnection = true },
             )
+            return
+        }
+        LaunchedEffect(connected) {
+            if (connected != null) {
+                scanning = false
+                showConnection = false
+            }
+        }
+        val connection = connected
+        val computerName = devices.firstOrNull { it.fingerprint == (connection?.device ?: remembered)?.fingerprint }?.name
+            ?: stringResource(Res.string.computer)
+        val secureSender = remember(connection) {
+            connection?.let { client -> MessageSender { _, message -> client.sendMessage(message) } }
+        }
+        App(
+            messages = inbox.mapNotNull { it.message?.let(::InboxMessage) },
+            attachments = inbox.mapNotNull { it.attachment },
+            previewAttachment = transfers.files::preview,
+            exportAttachment = ::exportAttachment,
+            deleteMessage = { transfers.deleteHistory(it.request.messageId) },
+            deleteAttachment = { transfers.deleteHistory(it.id) },
+            clearHistory = { transfers.deleteHistory(null) },
+            device = {
+                val label = when {
+                    connection != null -> computerName
+                    pairing == TransferStatus.Preparing -> stringResource(Res.string.connecting)
+                    remembered != null || developmentAddress != null -> stringResource(Res.string.connect_computer)
+                    else -> stringResource(Res.string.scan_to_connect)
+                }
+                DeviceButton(label) { connect() }
+                if (showConnection) {
+                    ClientConnectionDialog(
+                        paired = connection != null,
+                        remembered = remembered != null,
+                        authorized = authorized,
+                        status = pairing,
+                        invitationRejected = invitationRejected,
+                        knownAddress = remembered?.address ?: devices.singleOrNull()?.address,
+                        developmentAddress = developmentAddress,
+                        onDevelopmentAddress = if (development != null) {
+                            { address -> developmentAddress = address.takeIf { it.isNotBlank() } }
+                        } else null,
+                        onAuthorize = ::requestLanAccess,
+                        onScan = ::beginScan,
+                        onReconnect = transfers::reconnectSaved,
+                        onPair = transfers::pair,
+                        onForget = { transfers.disconnect(); showConnection = false },
+                        onClose = { showConnection = false },
+                    )
+                }
+            },
+            inboxStatus = {
+                if (inboxFailure) InboxOperationError()
+                val paused = incoming.status == TransferStatus.Canceled || incoming.status == TransferStatus.Failed
+                if (incoming.status != TransferStatus.Delivered) {
+                    TransferFeedback(
+                        incoming.status, incoming.progress,
+                        cancel = transfers::pauseReception.takeIf { connection != null && incoming.status == TransferStatus.Receiving },
+                        retry = transfers::retryReception.takeIf { connection != null && paused },
+                    )
+                }
+            },
+            composer = {
+                ClientSendComposer(
+                    title = if (connection != null || developmentAddress != null) {
+                        stringResource(Res.string.send_to_computer, computerName)
+                    } else stringResource(Res.string.send_prepare),
+                    senderId = senderId,
+                    initialDraft = initialDraft,
+                    sender = secureSender ?: development.takeIf { authorized },
+                    pairedAddress = connection?.address,
+                    peerIdentity = connection?.device?.fingerprint,
+                    developmentAddress = developmentAddress,
+                    file = selectedFile,
+                    outgoingStatus = outgoing.status,
+                    outgoingProgress = outgoing.progress,
+                    onChoose = { chooseFile.launch(arrayOf("*/*")) },
+                    onRemove = transfers::removeSelection,
+                    onSendFile = transfers::retryUpload,
+                    onCancelFile = transfers::cancelUpload,
+                    onConnect = ::connect,
+                )
+            },
+        )
+    }
+
+    @Composable
+    private fun ScanPage(
+        busy: Boolean,
+        failed: Boolean,
+        invitationRejected: Boolean,
+        authorized: Boolean,
+        onBack: () -> Unit,
+        onDetails: () -> Unit,
+    ) {
+        val allowed by cameraAllowed.collectAsStateWithLifecycle()
+        var requested by rememberSaveable { mutableStateOf(false) }
+        var cameraFailed by remember { mutableStateOf(false) }
+        var invalidCode by remember { mutableStateOf(false) }
+        var lastCode by remember { mutableStateOf<String?>(null) }
+        BackHandler(onBack = onBack)
+        DisposableEffect(Unit) {
+            val previous = requestedOrientation
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            onDispose { requestedOrientation = previous }
+        }
+        LaunchedEffect(authorized) {
+            if (authorized && !allowed && !requested) {
+                requested = true
+                cameraPermission.launch(Manifest.permission.CAMERA)
+            }
+        }
+        val instruction = stringResource(
+            when {
+                !authorized -> Res.string.delivery_permission
+                !allowed -> Res.string.pairing_camera_permission
+                cameraFailed -> Res.string.pairing_camera_failed
+                busy -> Res.string.connecting
+                invitationRejected -> Res.string.pairing_scan_refresh
+                failed -> Res.string.secure_pair_failed
+                invalidCode -> Res.string.pairing_scan_invalid
+                else -> Res.string.pairing_scan_target
+            },
+        )
+        val action = when {
+            !authorized -> Res.string.pairing_allow_network
+            !allowed && requested && !shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> Res.string.pairing_settings
+            !allowed -> Res.string.pairing_allow_network
+            cameraFailed || (failed && !invitationRejected) -> Res.string.attachment_retry
+            else -> null
+        }
+        PairingScanScreen(
+            instruction = instruction,
+            onBack = onBack,
+            onDetails = onDetails,
+            busy = busy,
+            actionLabel = action?.let { stringResource(it) },
+            onAction = {
+                when {
+                    !authorized -> requestLanAccess()
+                    action == Res.string.pairing_settings -> openPermissionSettings()
+                    !allowed -> cameraPermission.launch(Manifest.permission.CAMERA)
+                    else -> {
+                        cameraFailed = false
+                        invalidCode = false
+                        lastCode = null
+                        transfers.clearPairingFeedback()
+                    }
+                }
+            },
+        ) { modifier ->
+            if (allowed && authorized && !cameraFailed) {
+                ScannerPreview(
+                    modifier = modifier,
+                    onCameraError = {
+                        androidLogger.warn("Pairing camera failed", "type" to it.javaClass.simpleName)
+                        cameraFailed = true
+                    },
+                    onDecoded = { value ->
+                        if (transfers.pairing.value != TransferStatus.Preparing && value != lastCode) {
+                            val invitation = PairingInvitation.decode(value)
+                            invalidCode = invitation == null
+                            if (invitation != null) {
+                                lastCode = value
+                                transfers.pair(invitation.address, invitation.fingerprint, invitation.code)
+                            }
+                        }
+                    },
+                )
+            }
         }
     }
 
@@ -176,6 +325,12 @@ class MainActivity : ComponentActivity() {
         val allowed = hasLanPermission()
         discoveryEnabled.value = allowed
         transfers.networkPermissionChanged(allowed)
+        cameraAllowed.value = checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("networkRequested", networkRequested)
+        super.onSaveInstanceState(outState)
     }
 
     private fun exportAttachment(attachment: AttachmentInfo) {
@@ -183,10 +338,18 @@ class MainActivity : ComponentActivity() {
         saveFile.launch(attachment.name)
     }
 
-    private fun canAccessLan(): Boolean {
-        if (hasLanPermission()) return true
-        localNetworkPermission.launch(LOCAL_NETWORK)
-        return false
+    private fun requestLanAccess() {
+        if (hasLanPermission()) return
+        if (networkRequested && !shouldShowRequestPermissionRationale(LOCAL_NETWORK)) {
+            openPermissionSettings()
+        } else {
+            networkRequested = true
+            localNetworkPermission.launch(LOCAL_NETWORK)
+        }
+    }
+
+    private fun openPermissionSettings() {
+        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)))
     }
 
     private fun hasLanPermission(): Boolean =
@@ -199,6 +362,33 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
+    }
+}
+
+@Composable
+private fun ScannerPreview(modifier: Modifier, onCameraError: (Exception) -> Unit, onDecoded: (String) -> Unit) {
+    val context = LocalContext.current
+    val onResult by rememberUpdatedState(onDecoded)
+    val onError by rememberUpdatedState(onCameraError)
+    val scanner = remember(context) {
+        DecoratedBarcodeView(context).apply {
+            statusView.visibility = View.GONE
+            viewFinder.setLaserVisibility(false)
+            decoderFactory = DefaultDecoderFactory(listOf(BarcodeFormat.QR_CODE))
+            barcodeView.addStateListener(object : CameraPreview.StateListener {
+                override fun previewSized() = Unit
+                override fun previewStarted() = Unit
+                override fun previewStopped() = Unit
+                override fun cameraClosed() = Unit
+                override fun cameraError(error: Exception) = onError(error)
+            })
+            decodeContinuous { result -> onResult(result.text) }
+        }
+    }
+    AndroidView(factory = { scanner }, modifier = modifier)
+    LifecycleResumeEffect(scanner) {
+        scanner.resume()
+        onPauseOrDispose { scanner.pause() }
     }
 }
 

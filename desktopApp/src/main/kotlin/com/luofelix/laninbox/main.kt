@@ -8,13 +8,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import com.luofelix.laninbox.core.logging.AppLogger
 import com.luofelix.laninbox.core.network.DEVELOPMENT_PORT
+import com.luofelix.laninbox.feature.inbox.InboxOperationError
 import com.luofelix.laninbox.feature.inbox.ReceiverStatus
-import com.luofelix.laninbox.feature.send.TransferControls
-import com.luofelix.laninbox.feature.send.TransferStatus
 import io.ktor.server.engine.applicationEnvironment
 import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
@@ -31,6 +33,10 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withContext
+import laninbox.shared.generated.resources.Res
+import laninbox.shared.generated.resources.app_name
+import laninbox.shared.generated.resources.receiver_failed
+import org.jetbrains.compose.resources.stringResource
 
 private val logger = AppLogger { event -> println("[${event.level.name.uppercase()}] LanInbox: ${event.render()}") }
 
@@ -149,11 +155,15 @@ fun main() = application {
     }
     Window(
         onCloseRequest = ::exitApplication,
-        title = "LanInbox",
+        title = stringResource(Res.string.app_name),
+        state = rememberWindowState(width = 900.dp, height = 620.dp),
     ) {
         val scope = rememberCoroutineScope()
         val transferState = remember(scope, pairing, outbox) { DesktopTransferState(scope, pairing, outbox) }
         var exportFailed by remember { mutableStateOf(false) }
+        var showConnection by remember { mutableStateOf(false) }
+        val pairedSession by pairing.activeSession.collectAsState()
+        val ready = status == ReceiverStatus.SecureListening || status == ReceiverStatus.IdentityListening
         fun changeHistory(change: suspend () -> Unit) {
             scope.launch {
                 exportFailed = try {
@@ -168,8 +178,6 @@ fun main() = application {
         }
         App(
             messages = messages,
-            receiverStatus = status,
-            inboxOnly = true,
             attachments = attachments,
             previewAttachment = { desktopPreview(attachmentStore.payload(it)) },
             deleteMessage = { changeHistory { inbox.delete(it.request) } },
@@ -189,20 +197,30 @@ fun main() = application {
                     }
                 }
             },
-            inboxActions = {
-                DesktopTransferActions(
-                    window = window,
-                    receiverReady = status == ReceiverStatus.IdentityListening || status == ReceiverStatus.SecureListening,
+            device = {
+                DesktopConnection(
+                    shown = showConnection,
+                    onOpen = { showConnection = true },
+                    onClose = { showConnection = false },
+                    receiverReady = ready,
                     host = discoveredAddress ?: bindAddress.takeUnless { it == "0.0.0.0" },
                     fingerprint = fingerprint,
+                    paired = pairedSession != null,
                     pairing = pairing,
-                    outbox = outbox,
                     state = transferState,
                     deviceName = deviceName,
                 ) { name ->
                     deviceName = settings.saveDeviceName(name)
                 }
-                if (exportFailed) TransferControls(TransferStatus.Failed)
+            },
+            inboxStatus = {
+                if (status == ReceiverStatus.Failed) Text(stringResource(Res.string.receiver_failed))
+                if (exportFailed) InboxOperationError()
+            },
+            composer = {
+                DesktopSendComposer(window, ready, pairedSession != null, outbox, transferState) {
+                    showConnection = true
+                }
             },
         )
     }

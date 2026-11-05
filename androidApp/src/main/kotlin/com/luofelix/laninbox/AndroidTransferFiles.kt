@@ -14,6 +14,7 @@ import com.luofelix.laninbox.core.network.MessageJson
 import com.luofelix.laninbox.core.network.OutboundDelivery
 import com.luofelix.laninbox.core.network.attachmentMediaType
 import com.luofelix.laninbox.core.network.safeAttachmentName
+import com.luofelix.laninbox.feature.send.SelectedFile
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -32,6 +33,20 @@ internal class AndroidTransferFiles(private val application: Application) {
     private val inbox = File(application.filesDir, "secure-inbox")
     private val resolver = application.contentResolver
     private val historyLock = Mutex()
+
+    suspend fun describe(uri: Uri): SelectedFile = withContext(Dispatchers.IO) {
+        val fields = arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE)
+        resolver.query(uri, fields, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val name = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                val size = cursor.getColumnIndex(OpenableColumns.SIZE)
+                SelectedFile(
+                    safeAttachmentName(if (name >= 0) cursor.getString(name).orEmpty() else uri.lastPathSegment.orEmpty()),
+                    if (size >= 0 && !cursor.isNull(size)) cursor.getLong(size).takeIf { it >= 0 } else null,
+                )
+            } else null
+        } ?: SelectedFile(safeAttachmentName(uri.lastPathSegment.orEmpty()))
+    }
 
     suspend fun stage(uri: Uri): StagedUpload = withContext(Dispatchers.IO) {
         if (uri.scheme != "content" && uri.scheme != "file") throw IOException("Unsupported local URI")
