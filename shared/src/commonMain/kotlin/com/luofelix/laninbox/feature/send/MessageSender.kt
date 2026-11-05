@@ -22,6 +22,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.io.IOException
 import kotlinx.io.readByteArray
 import kotlinx.serialization.SerializationException
+import kotlin.time.Duration.Companion.milliseconds
 
 enum class DeliveryResult {
     Delivered, Timeout, Unreachable, Rejected, InvalidResponse, PermissionRequired,
@@ -45,7 +46,7 @@ class DevelopmentMessageSender(
     override suspend fun send(address: String, message: MessageRequest): DeliveryResult {
         val endpoint = developmentEndpoint(address) ?: return DeliveryResult.Rejected
         return try {
-            withTimeoutOrNull(8_000) {
+            withTimeoutOrNull(8_000.milliseconds) {
                 client.preparePost(endpoint) {
                     contentType(ContentType.Application.Json)
                     setBody(MessageJson.encodeToString(message))

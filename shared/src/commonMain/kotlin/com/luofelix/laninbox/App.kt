@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
@@ -20,9 +19,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.luofelix.laninbox.feature.inbox.InboxScreen
 import com.luofelix.laninbox.core.network.AttachmentInfo
 import com.luofelix.laninbox.feature.inbox.InboxMessage
+import com.luofelix.laninbox.feature.inbox.InboxScreen
 import com.luofelix.laninbox.feature.inbox.ReceiverStatus
 import com.luofelix.laninbox.feature.send.MessageSender
 import com.luofelix.laninbox.feature.send.SendScreen
@@ -31,7 +30,6 @@ import laninbox.shared.generated.resources.app_name
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 fun App(
     sender: MessageSender? = null,
     senderId: String = "",

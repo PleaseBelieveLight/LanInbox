@@ -11,12 +11,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 import laninbox.shared.generated.resources.Res
 import laninbox.shared.generated.resources.tab_inbox
 import laninbox.shared.generated.resources.tab_send
 import org.jetbrains.compose.resources.StringResource
+import kotlin.uuid.Uuid
 
 internal enum class AppDestination(val label: StringResource) {
     Send(Res.string.tab_send),
@@ -64,7 +63,6 @@ internal class AppViewModel(initialDraft: String) : ViewModel() {
         mutableUiState.update { transform(it).copy(result = null) }
     }
 
-    @OptIn(ExperimentalUuidApi::class)
     fun send(senderId: String, sender: MessageSender, pairedAddress: String? = null) {
         val state = uiState.value
         if (state.sending) return

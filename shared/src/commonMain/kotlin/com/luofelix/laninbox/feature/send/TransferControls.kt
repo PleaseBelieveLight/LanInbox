@@ -19,7 +19,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.luofelix.laninbox.core.network.MessageKind
-import laninbox.shared.generated.resources.*
+import laninbox.shared.generated.resources.Res
+import laninbox.shared.generated.resources.attachment_cancel
+import laninbox.shared.generated.resources.attachment_canceled
+import laninbox.shared.generated.resources.attachment_choose
+import laninbox.shared.generated.resources.attachment_failed
+import laninbox.shared.generated.resources.attachment_preparing
+import laninbox.shared.generated.resources.attachment_receiving
+import laninbox.shared.generated.resources.attachment_retry
+import laninbox.shared.generated.resources.delivered
+import laninbox.shared.generated.resources.delivery_permission
+import laninbox.shared.generated.resources.device_name
+import laninbox.shared.generated.resources.discover_desktops
+import laninbox.shared.generated.resources.receiver_address
+import laninbox.shared.generated.resources.reconnect_desktop
+import laninbox.shared.generated.resources.save_device_name
+import laninbox.shared.generated.resources.scan_pairing_qr
+import laninbox.shared.generated.resources.secure_disconnect
+import laninbox.shared.generated.resources.secure_fingerprint
+import laninbox.shared.generated.resources.secure_invitation
+import laninbox.shared.generated.resources.secure_pair
+import laninbox.shared.generated.resources.secure_pair_failed
+import laninbox.shared.generated.resources.secure_paired
+import laninbox.shared.generated.resources.send_draft
+import laninbox.shared.generated.resources.send_to_phone
+import laninbox.shared.generated.resources.sending
 import org.jetbrains.compose.resources.stringResource
 
 enum class TransferStatus { Preparing, Sending, Receiving, Delivered, Failed, Canceled, PermissionRequired }
@@ -110,13 +134,19 @@ fun SecurePairingForm(
         onScan?.let {
             OutlinedButton(enabled = !busy, onClick = it) { Text(stringResource(Res.string.scan_pairing_qr)) }
         }
-        OutlinedTextField(address, { address = it }, label = { Text(stringResource(Res.string.receiver_address)) },
-            enabled = !busy, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(fingerprint, { fingerprint = it }, label = { Text(stringResource(Res.string.secure_fingerprint)) },
-            enabled = !busy, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(invitation, { invitation = it }, label = { Text(stringResource(Res.string.secure_invitation)) },
+        OutlinedTextField(
+            address, { address = it }, label = { Text(stringResource(Res.string.receiver_address)) },
+            enabled = !busy, singleLine = true, modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            fingerprint, { fingerprint = it }, label = { Text(stringResource(Res.string.secure_fingerprint)) },
+            enabled = !busy, singleLine = true, modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            invitation, { invitation = it }, label = { Text(stringResource(Res.string.secure_invitation)) },
             enabled = !busy, singleLine = true, modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation())
+            visualTransformation = PasswordVisualTransformation()
+        )
         Button(
             enabled = !busy && address.isNotBlank() && fingerprint.isNotBlank() && invitation.isNotBlank(),
             onClick = { onPair(address, fingerprint, invitation) },
