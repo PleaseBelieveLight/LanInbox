@@ -17,8 +17,16 @@
 
 ## 安装与试用
 
-在仓库的 **Actions** 页面打开一次成功的 **Verify LanInbox** 构建，从 **Artifacts** 下载并解压
-`laninbox-verification-builds`。在 Android 安装调试版 APK，在 Windows 安装 MSI。也可以按页末的步骤从源码构建。
+打开 [Releases](https://github.com/PleaseBelieveLight/LanInbox/releases)，选择稳定版，或选择标记为
+**Pre-release** 的测试版。Android 7.0 及以上下载 `LanInbox-<version>-android.apk`，Windows x64 下载
+`LanInbox-<version>-windows-x64.msi`。Windows 安装包内置 Java 运行环境，目前未进行代码签名。
+每个版本还提供 `SHA256SUMS.txt`、构建信息和 Android 签名证书信息。
+
+首次发布前，或需要体验开发版时，可在 **Actions** 页面打开一次成功的 **Verify LanInbox** 构建，从
+**Artifacts** 下载并解压 `laninbox-verification-builds`，其中包含 **Debug 调试版 APK** 和 Windows MSI。
+
+从不同签名的 Debug APK 切换到发布版前，请保存需要保留的数据：Android 要求先卸载旧应用，这会清除应用数据和
+配对记录。较早的 Windows 验证构建也可能需要先卸载一次，再安装首个发布版。
 
 ### 发送第一条链接
 
@@ -52,6 +60,12 @@
 
 - 构建 Android APK 使用 `.\gradlew.bat :androidApp:assembleDebug`，产物在
   `androidApp/build/outputs/apk/debug/`。
+- 构建签名的 Release APK 前，按[发布指南](docs/releasing.md#android-signing)配置环境变量，再运行
+  `.\gradlew.bat --no-configuration-cache :androidApp:assembleRelease`，产物在
+  `androidApp/build/outputs/apk/release/`。
 - 启动 Windows 应用使用 `.\gradlew.bat :desktopApp:run`。
 - 打包 Windows MSI 需要 WiX 3.14.1。将 `WIX_PATH` 设为 `candle.exe` 和 `light.exe` 所在目录，再运行
   `.\gradlew.bat :desktopApp:packageMsi`。
+
+维护者请参阅[发布指南](docs/releasing.md)，了解版本编号、签名密钥、Tag 触发的 Release 草稿和
+[手动验收清单](docs/release-verification.md)。

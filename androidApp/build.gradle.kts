@@ -36,16 +36,26 @@ android {
         applicationId = "com.luofelix.laninbox"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = rootProject.extra["laninbox.androidVersionCode"] as Int
+        versionName = project.version.toString()
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    signingConfigs {
+        create("release") {
+            // Missing credentials fail release signing without blocking ordinary Debug builds.
+            storeFile = providers.environmentVariable("LANINBOX_KEYSTORE_PATH").orNull?.let { file(it) }
+            storePassword = providers.environmentVariable("LANINBOX_KEYSTORE_PASSWORD").orNull
+            keyAlias = providers.environmentVariable("LANINBOX_KEY_ALIAS").orNull
+            keyPassword = providers.environmentVariable("LANINBOX_KEY_PASSWORD").orNull
+        }
+    }
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

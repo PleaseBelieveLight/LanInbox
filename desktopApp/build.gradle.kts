@@ -44,8 +44,11 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             modules("java.naming", "java.prefs", "java.sql", "jdk.crypto.ec", "jdk.unsupported")
             packageName = "LanInbox"
-            packageVersion = "1.0.0"
+            packageVersion = rootProject.extra["laninbox.baseVersion"] as String
             windows {
+                msiPackageVersion = rootProject.extra["laninbox.windowsVersion"] as String
+                // Keep this identity constant so later installers can upgrade an existing installation.
+                upgradeUuid = "4c367b38-a4c2-4eaf-8a9a-65a0d83a8532"
                 iconFile.set(project.file("src/main/packaging/laninbox.ico"))
             }
         }

@@ -21,9 +21,19 @@ images, and files go directly between the two devices on the same network.
 
 ## Install and try it
 
-In this repository’s **Actions** tab, open a successful **Verify LanInbox** run. Under
-**Artifacts**, download and unzip `laninbox-verification-builds`. Install the Debug APK on
-Android and the MSI on Windows, or follow the build instructions below.
+Open [Releases](https://github.com/PleaseBelieveLight/LanInbox/releases) and choose a stable
+release, or select a **Pre-release** to try a test version. Download `LanInbox-<version>-android.apk`
+for Android 7.0 or later and `LanInbox-<version>-windows-x64.msi` for Windows x64. The Windows
+installer includes the Java runtime and is currently unsigned. Each release includes
+`SHA256SUMS.txt`, build information, and the Android signing certificate details.
+
+Until the first release is published, or to try a development build, open a successful
+**Verify LanInbox** run in the **Actions** tab. Under **Artifacts**, download and unzip
+`laninbox-verification-builds`. It contains a **Debug APK** and a Windows MSI.
+
+Save any data you need before switching from a Debug APK signed with another key: Android
+requires uninstalling it first, which removes app data and pairing. Older Windows verification
+builds may also need to be uninstalled once before installing the first release.
 
 ### Send your first link
 
@@ -64,6 +74,13 @@ Set `JAVA_HOME` to JDK 21 and run these commands from the repository root in Win
 
 - Build the Android APK with `.\gradlew.bat :androidApp:assembleDebug`. Find it in
   `androidApp/build/outputs/apk/debug/`.
+- For a signed Release APK, configure the environment variables in the
+  [release guide](docs/releasing.md#android-signing), then run
+  `.\gradlew.bat --no-configuration-cache :androidApp:assembleRelease`. Find it in
+  `androidApp/build/outputs/apk/release/`.
 - Launch the Windows app with `.\gradlew.bat :desktopApp:run`.
 - To build a Windows MSI, install WiX 3.14.1, set `WIX_PATH` to the directory containing
   `candle.exe` and `light.exe`, then run `.\gradlew.bat :desktopApp:packageMsi`.
+
+Maintainers: see the [release guide](docs/releasing.md) for version numbers, signing secrets,
+tag-triggered release drafts, and the [manual acceptance checklist](docs/release-verification.md).
