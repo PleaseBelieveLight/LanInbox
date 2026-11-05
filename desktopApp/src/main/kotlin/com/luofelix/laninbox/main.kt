@@ -33,9 +33,12 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withContext
+import laninbox.desktopapp.generated.resources.Res as DesktopRes
+import laninbox.desktopapp.generated.resources.laninbox_windows
 import laninbox.shared.generated.resources.Res
 import laninbox.shared.generated.resources.app_name
 import laninbox.shared.generated.resources.receiver_failed
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 private val logger = AppLogger { event -> println("[${event.level.name.uppercase()}] LanInbox: ${event.render()}") }
@@ -156,6 +159,7 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = stringResource(Res.string.app_name),
+        icon = painterResource(DesktopRes.drawable.laninbox_windows),
         state = rememberWindowState(width = 900.dp, height = 620.dp),
     ) {
         val scope = rememberCoroutineScope()

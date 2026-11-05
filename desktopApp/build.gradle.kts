@@ -35,6 +35,9 @@ compose.desktop {
             modules("java.naming", "java.prefs", "java.sql", "jdk.crypto.ec", "jdk.unsupported")
             packageName = "LanInbox"
             packageVersion = "1.0.0"
+            windows {
+                iconFile.set(project.file("src/main/packaging/laninbox.ico"))
+            }
         }
     }
 }
