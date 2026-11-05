@@ -74,6 +74,7 @@ class SharedLogicDesktopTest {
             model.send("phone", sender, "192.168.1.8:8443", peerIdentity = "paired-computer")
             advanceUntilIdle()
             assertEquals("Original", model.uiState.value.draft)
+            model.editDraft(model.uiState.value.draft)
             model.send("phone", sender, "192.168.1.9:8443", peerIdentity = "paired-computer")
             advanceUntilIdle()
             assertEquals(requests[0], requests[1])

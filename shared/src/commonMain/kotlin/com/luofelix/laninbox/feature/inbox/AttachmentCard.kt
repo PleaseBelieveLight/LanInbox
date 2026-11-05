@@ -26,6 +26,7 @@ internal fun AttachmentCard(
     preview: (suspend (AttachmentInfo) -> ImageBitmap?)?,
     export: ((AttachmentInfo) -> Unit)?,
     delete: ((AttachmentInfo) -> Unit)?,
+    leading: (@Composable () -> Unit)? = null,
 ) {
     var showingPreview by remember { mutableStateOf(false) }
     val canPreview = attachment.mediaType.startsWith("image/") && preview != null
@@ -40,6 +41,7 @@ internal fun AttachmentCard(
             }
         },
         onDelete = delete?.let { { it(attachment) } },
+        leading = leading,
     )
     if (showingPreview && preview != null) {
         val result by produceState<Pair<ImageBitmap?, Boolean>>(null to false, attachment) {

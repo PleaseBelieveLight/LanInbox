@@ -24,9 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.luofelix.laninbox.AppViewModel
 import com.luofelix.laninbox.core.network.MAX_MESSAGE_BYTES
 import com.luofelix.laninbox.core.network.MessageKind
 import laninbox.shared.generated.resources.*
@@ -132,66 +129,6 @@ fun SendComposer(
                 }
             }
             status()
-        }
-    }
-}
-
-@Composable
-fun ClientSendComposer(
-    title: String,
-    senderId: String,
-    initialDraft: String,
-    sender: MessageSender?,
-    pairedAddress: String?,
-    peerIdentity: String?,
-    developmentAddress: String?,
-    file: SelectedFile?,
-    outgoingStatus: TransferStatus?,
-    outgoingProgress: Float?,
-    onChoose: () -> Unit,
-    onRemove: () -> Unit,
-    onSendFile: () -> Unit,
-    onCancelFile: () -> Unit,
-    onConnect: () -> Unit,
-) {
-    val model = viewModel { AppViewModel(initialDraft) }
-    val state by model.uiState.collectAsStateWithLifecycle()
-    val fileBusy = outgoingStatus == TransferStatus.Preparing || outgoingStatus == TransferStatus.Sending
-    val connectRequired = sender == null || (pairedAddress == null && (file != null || developmentAddress == null))
-    val textFailure = file == null && state.result != null && state.result != DeliveryResult.Delivered
-    SendComposer(
-        title = title,
-        draft = state.draft,
-        onDraftChange = model::editDraft,
-        asCode = state.asCode,
-        onCodeChange = model::selectCode,
-        file = file,
-        onChoose = { model.clearFeedback(); onChoose() },
-        onRemove = onRemove,
-        onSubmit = {
-            when {
-                connectRequired -> onConnect()
-                file != null -> onSendFile()
-                else -> model.send(senderId, sender, pairedAddress ?: developmentAddress.orEmpty(), peerIdentity)
-            }
-        },
-        connectRequired = connectRequired,
-        enabled = !state.sending && !fileBusy,
-        failed = textFailure || (file != null && outgoingStatus == TransferStatus.Failed),
-    ) {
-        if (file != null || state.result == null) {
-            TransferFeedback(outgoingStatus, outgoingProgress, cancel = onCancelFile.takeIf { fileBusy })
-        }
-        val result = state.result
-        if (file == null && (state.sending || result != null)) {
-            val label = when {
-                state.sending -> Res.string.sending
-                result == DeliveryResult.Delivered -> Res.string.delivered
-                result == DeliveryResult.PermissionRequired -> Res.string.delivery_permission
-                result == DeliveryResult.Unreachable -> Res.string.delivery_unreachable
-                else -> Res.string.attachment_failed
-            }
-            Text(stringResource(label), style = MaterialTheme.typography.bodySmall)
         }
     }
 }

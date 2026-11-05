@@ -15,7 +15,6 @@ import kotlin.uuid.Uuid
 
 internal data class AppUiState(
     val draft: String = "",
-    val asCode: Boolean = false,
     val sending: Boolean = false,
     val result: DeliveryResult? = null,
 )
@@ -28,18 +27,16 @@ internal class AppViewModel(initialDraft: String) : ViewModel() {
     // A lost acknowledgment can follow a successful save. Match a paired peer by identity across address changes.
     private var pending: Pair<String, MessageRequest>? = null
 
-    fun editDraft(draft: String) = edit { it.copy(draft = draft) }
-
-    fun selectCode(asCode: Boolean) = edit { it.copy(asCode = asCode) }
+    fun editDraft(draft: String) {
+        val state = uiState.value
+        if (state.sending || state.draft == draft) return
+        // Editing the draft starts a new logical delivery.
+        pending = null
+        mutableUiState.update { it.copy(draft = draft, result = null) }
+    }
 
     fun clearFeedback() {
         mutableUiState.update { it.copy(result = null) }
-    }
-
-    private fun edit(transform: (AppUiState) -> AppUiState) {
-        if (uiState.value.sending) return
-        pending = null
-        mutableUiState.update { transform(it).copy(result = null) }
     }
 
     fun send(senderId: String, sender: MessageSender, address: String, peerIdentity: String?) {
@@ -49,7 +46,7 @@ internal class AppViewModel(initialDraft: String) : ViewModel() {
         val request = pending?.takeIf { it.first == destination }?.second ?: MessageRequest(
             senderId = senderId,
             messageId = Uuid.random().toString(),
-            kind = draftKind(state.draft, state.asCode),
+            kind = draftKind(state.draft, asCode = false),
             content = state.draft,
         )
         if (!request.isValid() || (peerIdentity == null && developmentEndpoint(address) == null)) {

@@ -33,9 +33,9 @@ Android and the MSI on Windows, or follow the build instructions below.
 3. On Android, paste `https://example.com` into the send area and tap **Send**. Copy the link
    from the Windows **Inbox**.
 
-After pairing, choose **Choose file** in the send area on either device. Review the selected
-file and tap **Send**. When sending to the phone, keep LanInbox in the foreground on Android
-until the file appears in its inbox.
+After pairing, use the **Image**, **Document**, or **File** icon in the Android editor, or
+**Choose file** on Windows. Review the attachment and tap **Send**. When sending to the phone,
+keep LanInbox in the foreground on Android until the file appears in its inbox.
 
 ### Connection troubleshooting
 

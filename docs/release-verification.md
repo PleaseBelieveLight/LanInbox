@@ -17,6 +17,10 @@ Run the device checks on Windows and a physical Android phone before publishing.
   on the phone. Test the toolbar and system back actions from a text and file draft. Deny camera
   or local-network access, then grant it and retry. Test discovery and manual entry on the
   Windows private firewall profile.
+- On Android, check that the top bar and editor reach the screen edges in both themes and
+  navigation modes. On a small screen with a large font, open the keyboard and verify the send
+  button stays visible. Use the image, document, and file pickers, cancel each, and check that
+  replacing or removing an attachment preserves the text draft.
 - Restart both apps and reconnect. Change the Windows address and rediscover the same identity.
   Reject a wrong fingerprint, an expired invitation, and a revoked credential.
 - Share a URL from Android and send multiline text in both directions. Copy it exactly. Lose

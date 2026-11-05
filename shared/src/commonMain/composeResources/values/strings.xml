@@ -24,13 +24,15 @@
     <string name="attachment_failed">Transfer failed. You can retry.</string>
     <string name="attachment_canceled">Transfer canceled.</string>
     <string name="attachment_choose">Choose file</string>
+    <string name="attachment_pick_image">Image</string>
+    <string name="attachment_pick_document">Document</string>
+    <string name="attachment_pick_file">File</string>
     <string name="attachment_cancel">Cancel</string>
     <string name="attachment_retry">Retry</string>
     <string name="send_to_phone">Send to phone</string>
     <string name="secure_fingerprint">Windows certificate fingerprint</string>
     <string name="secure_invitation">Pairing invitation</string>
     <string name="secure_pair">Connect</string>
-    <string name="secure_paired">Paired over HTTPS</string>
     <string name="secure_disconnect">Forget paired device</string>
     <string name="reconnect_desktop">Reconnect to paired computer</string>
     <string name="device_name">Device display name</string>
@@ -47,8 +49,11 @@
     <string name="connect_phone">Connect phone</string>
     <string name="paired_phone">Phone paired</string>
     <string name="connect_computer">Connect computer</string>
+    <string name="device_connected">Connected</string>
+    <string name="device_disconnected">Not connected</string>
+    <string name="device_offline_name">%1$s · Offline</string>
+    <string name="retry_connection">Retry connection</string>
     <string name="computer">Computer</string>
-    <string name="send_to_computer">Send to %1$s</string>
     <string name="send_prepare">Prepare to send</string>
     <string name="send_options">Format</string>
     <string name="send_as_code">Send as code</string>
@@ -80,5 +85,6 @@
     <string name="pairing_no_address">Connect this computer to the local network to show a QR code.</string>
     <string name="receive_error">Could not update the inbox. Try again.</string>
     <string name="development_mode">Developer connection</string>
+    <string name="development_address">IPv4 address (optional port)</string>
     <string name="save">Save</string>
 </resources>

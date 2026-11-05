@@ -24,13 +24,15 @@
     <string name="attachment_failed">传输失败，可以重试。</string>
     <string name="attachment_canceled">已取消传输。</string>
     <string name="attachment_choose">选文件</string>
+    <string name="attachment_pick_image">图片</string>
+    <string name="attachment_pick_document">文档</string>
+    <string name="attachment_pick_file">文件</string>
     <string name="attachment_cancel">取消</string>
     <string name="attachment_retry">重试</string>
     <string name="send_to_phone">发送到手机</string>
     <string name="secure_fingerprint">Windows 证书指纹</string>
     <string name="secure_invitation">配对邀请</string>
     <string name="secure_pair">连接</string>
-    <string name="secure_paired">已通过 HTTPS 配对</string>
     <string name="secure_disconnect">忘记已配对设备</string>
     <string name="reconnect_desktop">重新连接已配对电脑</string>
     <string name="device_name">设备显示名称</string>
@@ -47,8 +49,11 @@
     <string name="connect_phone">连接手机</string>
     <string name="paired_phone">手机 · 已配对</string>
     <string name="connect_computer">连接电脑</string>
+    <string name="device_connected">已连接</string>
+    <string name="device_disconnected">未连接</string>
+    <string name="device_offline_name">%1$s · 离线</string>
+    <string name="retry_connection">重试连接</string>
     <string name="computer">电脑</string>
-    <string name="send_to_computer">发送到%1$s</string>
     <string name="send_prepare">准备发送</string>
     <string name="send_options">格式</string>
     <string name="send_as_code">按代码发送</string>
@@ -80,5 +85,6 @@
     <string name="pairing_no_address">请先让电脑连接局域网。</string>
     <string name="receive_error">收件箱操作失败，请重试。</string>
     <string name="development_mode">开发连接</string>
+    <string name="development_address">IPv4 地址（可加端口）</string>
     <string name="save">保存</string>
 </resources>

@@ -57,6 +57,8 @@ internal fun InboxScreen(
     clearHistory: (() -> Unit)?,
     status: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    messageIcon: (@Composable (MessageKind) -> Unit)? = null,
+    attachmentIcon: (@Composable (AttachmentInfo) -> Unit)? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     val snackbar = remember { SnackbarHostState() }
@@ -142,10 +144,14 @@ internal fun InboxScreen(
                         }) { Text(stringResource(Res.string.copy_message)) }
                     },
                     onDelete = deleteMessage?.let { { it(item) } },
+                    leading = if (messageIcon != null) ({ messageIcon(message.kind) }) else null,
                 )
             }
             items(attachments, key = { "attachment:${it.id}" }) { attachment ->
-                AttachmentCard(attachment, previewAttachment, exportAttachment, deleteAttachment)
+                AttachmentCard(
+                    attachment, previewAttachment, exportAttachment, deleteAttachment,
+                    leading = if (attachmentIcon != null) ({ attachmentIcon(attachment) }) else null,
+                )
             }
         }
         SnackbarHost(snackbar)
@@ -169,11 +175,13 @@ internal fun InboxRow(
     onOpen: (() -> Unit)?,
     action: @Composable () -> Unit,
     onDelete: (() -> Unit)?,
+    leading: (@Composable () -> Unit)? = null,
 ) {
     Row(
         Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        leading?.invoke()
         Column(
             Modifier.weight(1f)
                 .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
