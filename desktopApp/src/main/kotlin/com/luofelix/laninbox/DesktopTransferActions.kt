@@ -70,8 +70,6 @@ internal class DesktopTransferState(
         private set
     var draft by mutableStateOf("")
         private set
-    var asCode by mutableStateOf(false)
-        private set
     var preparation by mutableStateOf<TransferStatus?>(null)
         private set
     var showDelivery by mutableStateOf(false)
@@ -91,12 +89,6 @@ internal class DesktopTransferState(
         resetFeedback()
     }
 
-    fun selectCode(selected: Boolean) {
-        if (busy()) return
-        asCode = selected
-        resetFeedback()
-    }
-
     private fun resetFeedback() {
         preparation = null
         showDelivery = false
@@ -107,7 +99,7 @@ internal class DesktopTransferState(
         if (busy()) return
         val source = file
         if (source == null) {
-            preparation = if (outbox.enqueueText(owner, draft, draftKind(draft, asCode))) {
+            preparation = if (outbox.enqueueText(owner, draft, draftKind(draft, asCode = false))) {
                 showDelivery = true
                 null
             } else TransferStatus.Failed
@@ -134,7 +126,6 @@ internal class DesktopTransferState(
         if (file != null) file = null
         else {
             draft = ""
-            asCode = false
         }
     }
 
@@ -200,25 +191,27 @@ internal fun DesktopSendComposer(
     LaunchedEffect(delivered) {
         delivered?.let(state::complete)
     }
+    val imageFilter = DesktopFileFilter.images(stringResource(Res.string.attachment_pick_image))
+    fun chooseFile(filter: DesktopFileFilter? = null) {
+        if (!enabled) return
+        choosingFile = true
+        dropTarget.clearError()
+        scope.launch {
+            try {
+                chooseDesktopPath(window, FileDialog.LOAD, logger, filter = filter)?.let(state::selectFile)
+            } finally {
+                choosingFile = false
+            }
+        }
+    }
 
     SendComposer(
         title = stringResource(if (paired) Res.string.send_to_phone else Res.string.send_prepare),
         draft = state.draft,
         onDraftChange = state::editDraft,
-        asCode = state.asCode,
-        onCodeChange = state::selectCode,
         file = source?.let { SelectedFile(it.fileName.toString(), size) },
-        onChoose = {
-            if (!choosingFile) scope.launch {
-                dropTarget.clearError()
-                choosingFile = true
-                try {
-                    chooseDesktopPath(window, FileDialog.LOAD, logger)?.let(state::selectFile)
-                } finally {
-                    choosingFile = false
-                }
-            }
-        },
+        onChooseFile = { chooseFile() },
+        onChooseImage = { chooseFile(imageFilter) },
         onRemove = {
             dropTarget.clearError()
             state.selectFile(null)

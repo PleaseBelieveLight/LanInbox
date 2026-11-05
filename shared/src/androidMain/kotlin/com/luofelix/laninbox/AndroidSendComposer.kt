@@ -7,27 +7,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TooltipAnchorPosition
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -117,15 +110,15 @@ fun AndroidSendComposer(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row {
-                AttachmentAction(AndroidIcons.Image, stringResource(Res.string.attachment_pick_image), enabled) {
+                AttachmentAction(AppIcons.Image, stringResource(Res.string.attachment_pick_image), enabled) {
                     model.clearFeedback()
                     onPickImage()
                 }
-                AttachmentAction(AndroidIcons.Document, stringResource(Res.string.attachment_pick_document), enabled) {
+                AttachmentAction(AppIcons.Document, stringResource(Res.string.attachment_pick_document), enabled) {
                     model.clearFeedback()
                     onPickDocument()
                 }
-                AttachmentAction(AndroidIcons.Folder, stringResource(Res.string.attachment_pick_file), enabled) {
+                AttachmentAction(AppIcons.Folder, stringResource(Res.string.attachment_pick_file), enabled) {
                     model.clearFeedback()
                     onPickFile()
                 }
@@ -142,7 +135,7 @@ fun AndroidSendComposer(
                 },
             ) {
                 Icon(
-                    imageVector = if (retry && !connectRequired) AndroidIcons.Retry else AndroidIcons.Send,
+                    imageVector = if (retry && !connectRequired) AppIcons.Retry else AppIcons.Send,
                     contentDescription = sendLabel,
                 )
             }
@@ -183,29 +176,14 @@ private fun AndroidAttachmentDraft(file: SelectedFile, enabled: Boolean, onRemov
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(AndroidIcons.Document, contentDescription = null, modifier = Modifier.size(20.dp))
+            Icon(AppIcons.Document, contentDescription = null, modifier = Modifier.size(20.dp))
             Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                 Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
                 file.size?.let { Text(fileSizeLabel(it), style = MaterialTheme.typography.bodySmall) }
             }
             IconButton(onClick = onRemove, enabled = enabled) {
-                Icon(AndroidIcons.Close, contentDescription = stringResource(Res.string.attachment_remove))
+                Icon(AppIcons.Close, contentDescription = stringResource(Res.string.attachment_remove))
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AttachmentAction(icon: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
-    TooltipBox(
-        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-        tooltip = { PlainTooltip { Text(label) } },
-        state = rememberTooltipState(),
-        enableUserInput = enabled,
-    ) {
-        IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp)) {
-            Icon(icon, contentDescription = label)
         }
     }
 }

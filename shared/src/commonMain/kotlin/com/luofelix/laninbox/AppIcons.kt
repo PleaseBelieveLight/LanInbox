@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
 
-internal object AndroidIcons {
+internal object AppIcons {
     val Back = outline("Back", "M19 12 H5 M12 19 L5 12 L12 5")
     val Close = outline("Close", "M6 6 L18 18 M6 18 L18 6")
     val More = outline("More", "M12 5 H12.1 M12 12 H12.1 M12 19 H12.1")

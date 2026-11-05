@@ -5,6 +5,7 @@ import com.luofelix.laninbox.core.logging.AppLogger
 import com.sun.jna.Native
 import com.sun.jna.Platform
 import com.sun.jna.Pointer
+import com.sun.jna.Structure
 import com.sun.jna.WString
 import com.sun.jna.platform.win32.COM.COMUtils
 import com.sun.jna.platform.win32.COM.Unknown
@@ -16,6 +17,7 @@ import com.sun.jna.platform.win32.WinNT.HRESULT
 import com.sun.jna.ptr.IntByReference
 import com.sun.jna.ptr.PointerByReference
 import java.awt.FileDialog
+import java.io.File
 import java.nio.file.Path
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CancellationException
@@ -24,12 +26,24 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.withContext
 
+internal class DesktopFileFilter private constructor(val label: String, val extensions: List<String>) {
+    fun accepts(name: String): Boolean = extensions.any { name.endsWith(".$it", ignoreCase = true) }
+
+    companion object {
+        fun images(label: String) = DesktopFileFilter(
+            label,
+            listOf("png", "jpg", "jpeg", "gif", "webp", "bmp", "tif", "tiff", "heic", "heif", "avif", "svg", "ico"),
+        )
+    }
+}
+
 /** Returns a selected path, or null on cancellation, without blocking Compose's event thread. */
 internal suspend fun chooseDesktopPath(
     window: ComposeWindow,
     mode: Int,
     logger: AppLogger,
     name: String? = null,
+    filter: DesktopFileFilter? = null,
 ): Path? = withContext(Dispatchers.Swing) {
     require(mode == FileDialog.LOAD || mode == FileDialog.SAVE)
     if (Platform.isWindows()) {
@@ -40,7 +54,7 @@ internal suspend fun chooseDesktopPath(
                 Thread(task, "LanInbox-file-dialog").apply { isDaemon = true }
             }.asCoroutineDispatcher().use { dispatcher ->
                 return@withContext withContext(dispatcher) {
-                    withWindowsFileDialog(mode, name) { dialog ->
+                    withWindowsFileDialog(mode, name, filter) { dialog ->
                         if (dialog.show(owner)) dialog.selectedPath() else null
                     }
                 }
@@ -57,6 +71,11 @@ internal suspend fun chooseDesktopPath(
     val picker = FileDialog(window, null, mode)
     try {
         picker.file = name
+        if (filter != null) {
+            picker.setFilenameFilter { directory, file ->
+                File(directory, file).isDirectory || filter.accepts(file)
+            }
+        }
         picker.isVisible = true
         val file = picker.file ?: return@withContext null
         val directory = picker.directory ?: return@withContext null
@@ -70,6 +89,7 @@ internal suspend fun chooseDesktopPath(
 internal fun <T> withWindowsFileDialog(
     mode: Int,
     name: String? = null,
+    filter: DesktopFileFilter? = null,
     action: (WindowsFileDialog) -> T,
 ): T {
     require(mode == FileDialog.LOAD || mode == FileDialog.SAVE)
@@ -94,6 +114,7 @@ internal fun <T> withWindowsFileDialog(
             // Preserve Windows defaults, including overwrite confirmation and existing-file checks.
             dialog.options = dialog.options or 0x40 // FOS_FORCEFILESYSTEM: callers need a real Path.
             if (name != null) dialog.setFileName(name)
+            if (filter != null) dialog.setFileFilter(filter)
             return action(dialog)
         } finally {
             dialog.Release()
@@ -106,6 +127,8 @@ internal fun <T> withWindowsFileDialog(
 
 /** Minimal IFileDialog binding; method slots follow the Windows SDK's shobjidl_core.h. */
 internal class WindowsFileDialog(pointer: Pointer) : Unknown(pointer) {
+    private var filterSpec: WindowsFilterSpec? = null
+
     var options: Int
         get() {
             val result = IntByReference()
@@ -118,6 +141,17 @@ internal class WindowsFileDialog(pointer: Pointer) : Unknown(pointer) {
 
     fun setFileName(name: String) {
         COMUtils.checkRC(invoke(15, WString(name))) // IFileDialog::SetFileName
+    }
+
+    fun setFileFilter(filter: DesktopFileFilter) {
+        // Keep the UTF-16 strings and their structure alive until the dialog is released.
+        val spec = WindowsFilterSpec().apply {
+            name = WString(filter.label)
+            patterns = WString(filter.extensions.joinToString(";") { "*.$it" })
+        }
+        filterSpec = spec
+        COMUtils.checkRC(invoke(4, 1, spec)) // IFileDialog::SetFileTypes
+        COMUtils.checkRC(invoke(5, 1)) // IFileDialog::SetFileTypeIndex uses one-based indexes.
     }
 
     fun show(owner: HWND): Boolean {
@@ -140,6 +174,12 @@ internal class WindowsFileDialog(pointer: Pointer) : Unknown(pointer) {
 
     private fun invoke(slot: Int, vararg arguments: Any): HRESULT =
         _invokeNativeObject(slot, arrayOf(pointer, *arguments), HRESULT::class.java) as HRESULT
+}
+
+@Structure.FieldOrder("name", "patterns")
+internal class WindowsFilterSpec : Structure() {
+    @JvmField var name: WString? = null
+    @JvmField var patterns: WString? = null
 }
 
 private class WindowsShellItem(pointer: Pointer) : Unknown(pointer) {

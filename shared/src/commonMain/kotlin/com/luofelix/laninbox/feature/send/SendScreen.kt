@@ -8,22 +8,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.luofelix.laninbox.AppIcons
+import com.luofelix.laninbox.AttachmentAction
 import com.luofelix.laninbox.core.network.MAX_MESSAGE_BYTES
 import com.luofelix.laninbox.core.network.MessageKind
 import laninbox.shared.generated.resources.*
@@ -44,10 +41,9 @@ fun SendComposer(
     title: String,
     draft: String,
     onDraftChange: (String) -> Unit,
-    asCode: Boolean,
-    onCodeChange: (Boolean) -> Unit,
     file: SelectedFile?,
-    onChoose: () -> Unit,
+    onChooseFile: () -> Unit,
+    onChooseImage: () -> Unit,
     onRemove: () -> Unit,
     onSubmit: () -> Unit,
     connectRequired: Boolean,
@@ -57,7 +53,6 @@ fun SendComposer(
     highlighted: Boolean = false,
     status: @Composable () -> Unit = {},
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
     val tooLong = remember(draft) { draft.encodeToByteArray().size > MAX_MESSAGE_BYTES }
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -101,24 +96,9 @@ fun SendComposer(
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onChoose, enabled = enabled) {
-                    Text(stringResource(Res.string.attachment_choose))
-                }
-                if (file == null) {
-                    Column(Modifier.weight(1f)) {
-                        TextButton(onClick = { menuOpen = true }, enabled = enabled) {
-                            Text(stringResource(if (asCode) Res.string.kind_code else Res.string.send_options), maxLines = 1)
-                        }
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(if (asCode) Res.string.send_as_text else Res.string.send_as_code)) },
-                                onClick = { onCodeChange(!asCode); menuOpen = false },
-                            )
-                        }
-                    }
-                } else {
-                    Spacer(Modifier.weight(1f))
-                }
+                AttachmentAction(AppIcons.Folder, stringResource(Res.string.attachment_pick_file), enabled, onChooseFile)
+                AttachmentAction(AppIcons.Image, stringResource(Res.string.attachment_pick_image), enabled, onChooseImage)
+                Spacer(Modifier.weight(1f))
                 Button(
                     onClick = onSubmit,
                     enabled = enabled && (file != null || (draft.isNotBlank() && !tooLong)),

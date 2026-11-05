@@ -100,7 +100,7 @@ fun AndroidConnectionSheet(
             ) {
                 Text(stringResource(Res.string.connect_computer), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
                 IconButton(onClick = onClose) {
-                    Icon(AndroidIcons.Close, contentDescription = stringResource(Res.string.close))
+                    Icon(AppIcons.Close, contentDescription = stringResource(Res.string.close))
                 }
             }
             HorizontalDivider()
@@ -127,7 +127,7 @@ fun AndroidConnectionSheet(
                     ) {
                         Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer) {
                             Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                                Icon(AndroidIcons.Computer, contentDescription = null)
+                                Icon(AppIcons.Computer, contentDescription = null)
                             }
                         }
                         Column {
@@ -279,7 +279,7 @@ fun AndroidPairingScanScreen(
             topBar = {
                 AndroidTopBar(stringResource(Res.string.pairing_scan_title), onBack = onBack) {
                     IconButton(onClick = onDetails) {
-                        Icon(AndroidIcons.More, contentDescription = stringResource(Res.string.pairing_details))
+                        Icon(AppIcons.More, contentDescription = stringResource(Res.string.pairing_details))
                     }
                 }
             },
@@ -316,7 +316,7 @@ fun AndroidPairingScanScreen(
                                 if (preview != null) {
                                     preview(Modifier.matchParentSize())
                                 } else {
-                                    Icon(AndroidIcons.Scan, contentDescription = null, modifier = Modifier.size(44.dp), tint = Color(0xFFB8C8E0))
+                                    Icon(AppIcons.Scan, contentDescription = null, modifier = Modifier.size(44.dp), tint = Color(0xFFB8C8E0))
                                 }
                                 if (busy) {
                                     Surface(shape = MaterialTheme.shapes.medium) {

@@ -11,6 +11,7 @@ import com.sun.jna.platform.win32.COM.Unknown
 import com.sun.jna.platform.win32.Ole32
 import com.sun.jna.platform.win32.WinDef.HWND
 import com.sun.jna.platform.win32.WinNT.HRESULT
+import com.sun.jna.ptr.IntByReference
 import com.sun.jna.ptr.PointerByReference
 import com.sun.jna.win32.StdCallLibrary.StdCallCallback
 import java.awt.FileDialog
@@ -22,6 +23,28 @@ import kotlin.test.assertTrue
 import org.junit.Assume.assumeTrue
 
 class DesktopFileDialogTest {
+    @Test
+    fun imageFilterIncludesCommonImageTypesAndRejectsDocuments() {
+        val filter = DesktopFileFilter.images("图片")
+        listOf("照片.PNG", "photo.jpeg", "animation.gif", "picture.webp", "photo.heic", "vector.svg").forEach {
+            assertTrue(filter.accepts(it), it)
+        }
+        listOf("notes.txt", "report.pdf", "photo.jpg.exe", "image").forEach {
+            assertFalse(filter.accepts(it), it)
+        }
+    }
+
+    @Test
+    fun modernImageDialogAcceptsLocalizedImageFilter() {
+        assumeTrue(Platform.isWindows())
+        withWindowsFileDialog(FileDialog.LOAD, filter = DesktopFileFilter.images("图片")) { dialog ->
+            val index = IntByReference()
+            COMUtils.checkRC(DialogInspection(dialog.pointer).getFileTypeIndex(index))
+            assertEquals(1, index.value)
+            assertTrue(dialog.options and 0x1000 != 0) // FOS_FILEMUSTEXIST
+        }
+    }
+
     @Test
     fun modernOpenDialogRequiresOneExistingFileSystemPath() {
         assumeTrue(Platform.isWindows())
@@ -90,6 +113,9 @@ class DesktopFileDialogTest {
     }
 
     private class DialogInspection(pointer: Pointer) : Unknown(pointer) {
+        fun getFileTypeIndex(result: IntByReference): HRESULT =
+            _invokeNativeObject(6, arrayOf(pointer, result), HRESULT::class.java) as HRESULT
+
         fun getFileName(result: PointerByReference): HRESULT =
             _invokeNativeObject(16, arrayOf(pointer, result), HRESULT::class.java) as HRESULT
     }

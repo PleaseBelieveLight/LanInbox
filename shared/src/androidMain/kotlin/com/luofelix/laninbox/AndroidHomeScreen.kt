@@ -96,14 +96,14 @@ fun AndroidHomeScreen(
                 messageIcon = { kind ->
                     InboxTypeIcon(
                         when (kind) {
-                            MessageKind.Text -> AndroidIcons.Document
-                            MessageKind.Link -> AndroidIcons.Link
-                            MessageKind.Code -> AndroidIcons.Code
+                            MessageKind.Text -> AppIcons.Document
+                            MessageKind.Link -> AppIcons.Link
+                            MessageKind.Code -> AppIcons.Code
                         },
                     )
                 },
                 attachmentIcon = { attachment ->
-                    InboxTypeIcon(if (attachment.mediaType.startsWith("image/")) AndroidIcons.Image else AndroidIcons.Document)
+                    InboxTypeIcon(if (attachment.mediaType.startsWith("image/")) AppIcons.Image else AppIcons.Document)
                 },
             )
         }
@@ -133,7 +133,7 @@ internal fun AndroidTopBar(
             ) {
                 if (onBack != null) {
                     IconButton(onClick = onBack) {
-                        Icon(AndroidIcons.Back, contentDescription = stringResource(Res.string.back))
+                        Icon(AppIcons.Back, contentDescription = stringResource(Res.string.back))
                     }
                 }
                 Text(
@@ -157,7 +157,7 @@ fun AndroidDeviceButton(label: String, scan: Boolean, onClick: () -> Unit) {
         modifier = Modifier.widthIn(max = 164.dp).heightIn(min = 48.dp),
     ) {
         Icon(
-            if (scan) AndroidIcons.Scan else AndroidIcons.Computer,
+            if (scan) AppIcons.Scan else AppIcons.Computer,
             contentDescription = null,
             modifier = Modifier.size(17.dp),
         )
