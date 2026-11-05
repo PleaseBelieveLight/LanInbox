@@ -35,6 +35,7 @@
     <string name="attachment_failed">Transfer failed. Check the connection, file size, and available storage.</string>
     <string name="attachment_canceled">Transfer canceled.</string>
     <string name="attachment_choose">Choose file or image</string>
+    <string name="attachment_pair_required">Pair over HTTPS to send files or images.</string>
     <string name="attachment_cancel">Cancel</string>
     <string name="attachment_retry">Retry</string>
     <string name="send_to_phone">Send to phone</string>

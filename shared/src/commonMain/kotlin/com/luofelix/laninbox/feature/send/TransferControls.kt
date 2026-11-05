@@ -24,6 +24,7 @@ import laninbox.shared.generated.resources.attachment_cancel
 import laninbox.shared.generated.resources.attachment_canceled
 import laninbox.shared.generated.resources.attachment_choose
 import laninbox.shared.generated.resources.attachment_failed
+import laninbox.shared.generated.resources.attachment_pair_required
 import laninbox.shared.generated.resources.attachment_preparing
 import laninbox.shared.generated.resources.attachment_receiving
 import laninbox.shared.generated.resources.attachment_retry
@@ -54,6 +55,8 @@ fun TransferControls(
     progress: Float? = null,
     name: String? = null,
     choose: (() -> Unit)? = null,
+    chooseEnabled: Boolean = true,
+    pairingRequired: Boolean = false,
     cancel: (() -> Unit)? = null,
     retry: (() -> Unit)? = null,
 ) {
@@ -74,8 +77,13 @@ fun TransferControls(
             else LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
         }
     }
+    if (pairingRequired) Text(stringResource(Res.string.attachment_pair_required))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        choose?.let { OutlinedButton(onClick = it) { Text(stringResource(Res.string.attachment_choose)) } }
+        choose?.let {
+            OutlinedButton(onClick = it, enabled = chooseEnabled && !pairingRequired) {
+                Text(stringResource(Res.string.attachment_choose))
+            }
+        }
         cancel?.let { OutlinedButton(onClick = it) { Text(stringResource(Res.string.attachment_cancel)) } }
         retry?.let { OutlinedButton(onClick = it) { Text(stringResource(Res.string.attachment_retry)) } }
     }

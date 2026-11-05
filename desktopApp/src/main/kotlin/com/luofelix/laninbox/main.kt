@@ -190,13 +190,17 @@ fun main() = application {
                 }
             },
             inboxActions = {
-                if (status == ReceiverStatus.IdentityListening || status == ReceiverStatus.SecureListening) {
-                    DesktopTransferActions(
-                        window, discoveredAddress ?: bindAddress.takeUnless { it == "0.0.0.0" },
-                        fingerprint, pairing, outbox, transferState, deviceName,
-                    ) { name ->
-                        deviceName = settings.saveDeviceName(name)
-                    }
+                DesktopTransferActions(
+                    window = window,
+                    receiverReady = status == ReceiverStatus.IdentityListening || status == ReceiverStatus.SecureListening,
+                    host = discoveredAddress ?: bindAddress.takeUnless { it == "0.0.0.0" },
+                    fingerprint = fingerprint,
+                    pairing = pairing,
+                    outbox = outbox,
+                    state = transferState,
+                    deviceName = deviceName,
+                ) { name ->
+                    deviceName = settings.saveDeviceName(name)
                 }
                 if (exportFailed) TransferControls(TransferStatus.Failed)
             },

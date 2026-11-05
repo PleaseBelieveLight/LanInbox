@@ -88,6 +88,7 @@ internal class DesktopTransferState(
 @Composable
 internal fun DesktopTransferActions(
     window: ComposeWindow,
+    receiverReady: Boolean,
     host: String?,
     fingerprint: String,
     pairing: DesktopPairingSession,
@@ -97,27 +98,14 @@ internal fun DesktopTransferActions(
     onDeviceName: (String) -> Unit,
 ) {
     val session by pairing.activeSession.collectAsState()
-    val invitation by pairing.invitation.collectAsState()
     val queued by outbox.delivery.collectAsState()
     val delivered by outbox.delivered.collectAsState()
     val preparation = state.preparation
     val lastSource = state.lastSource
-    val address = host?.let { "$it:$SECURE_PORT" }
-    DeviceNameEditor(deviceName, onDeviceName)
-    address?.let { SelectionContainer { Text(it) } }
-    SelectionContainer { Text(fingerprint) }
-    val code = invitation
-    val qr = remember(code, address, fingerprint) {
-        if (code != null && address != null && privateLanAuthority(address, SECURE_PORT) != null) {
-            pairingQr(PairingInvitation(address, fingerprint, code))
-        } else null
-    }
-    PairingPanel(invitation, qr, pairing::issueInvitation, state::revoke)
     val active = queued
     val attachment = active?.delivery?.attachment
     val idle = active == null && preparation != TransferStatus.Preparing
-    val ready = session != null && idle
-    DesktopTextSend(ready, state::sendText)
+    val ready = receiverReady && session != null && idle
     val status = when {
         active != null -> TransferStatus.Sending
         preparation != null -> preparation
@@ -130,11 +118,28 @@ internal fun DesktopTransferActions(
             if (it.size == 0L) 1f else (active.transferred.toDouble() / it.size).toFloat().coerceIn(0f, 1f)
         },
         name = attachment?.name ?: lastSource?.fileName?.toString()?.takeIf { preparation != null },
-        choose = if (ready) ({ chooseDesktopPath(window, FileDialog.LOAD)?.let(state::prepare) }) else null,
+        choose = { chooseDesktopPath(window, FileDialog.LOAD)?.let(state::prepare) },
+        chooseEnabled = receiverReady && idle,
+        pairingRequired = receiverReady && session == null,
         cancel = if (!idle) state::cancel else null,
         retry = if (ready && (preparation == TransferStatus.Canceled || preparation == TransferStatus.Failed))
             ({ lastSource?.let(state::prepare) }) else null,
     )
+    if (!receiverReady) return
+
+    val invitation by pairing.invitation.collectAsState()
+    val address = host?.let { "$it:$SECURE_PORT" }
+    DeviceNameEditor(deviceName, onDeviceName)
+    address?.let { SelectionContainer { Text(it) } }
+    SelectionContainer { Text(fingerprint) }
+    val code = invitation
+    val qr = remember(code, address, fingerprint) {
+        if (code != null && address != null && privateLanAuthority(address, SECURE_PORT) != null) {
+            pairingQr(PairingInvitation(address, fingerprint, code))
+        } else null
+    }
+    PairingPanel(invitation, qr, pairing::issueInvitation, state::revoke)
+    DesktopTextSend(ready, state::sendText)
 }
 
 internal fun chooseDesktopPath(window: ComposeWindow, mode: Int, name: String? = null): Path? {

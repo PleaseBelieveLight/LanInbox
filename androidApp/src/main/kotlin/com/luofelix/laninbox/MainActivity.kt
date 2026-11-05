@@ -123,6 +123,17 @@ class MainActivity : ComponentActivity() {
                 deleteAttachment = { transfers.deleteHistory(it.id) },
                 clearHistory = { transfers.deleteHistory(null) },
                 sendActions = {
+                    val busy = outgoing.status == TransferStatus.Preparing || outgoing.status == TransferStatus.Sending
+                    TransferControls(
+                        outgoing.status, outgoing.progress, outgoing.name,
+                        choose = { chooseFile.launch(arrayOf("*/*")) },
+                        chooseEnabled = !busy,
+                        pairingRequired = connected == null,
+                        cancel = if (busy) transfers::cancelUpload else null,
+                        retry = if (connected != null &&
+                            (outgoing.status == TransferStatus.Failed || outgoing.status == TransferStatus.Canceled)
+                        ) transfers::retryUpload else null,
+                    )
                     SecurePairingForm(
                         connected = connected != null,
                         busy = pairing == TransferStatus.Preparing,
@@ -146,16 +157,6 @@ class MainActivity : ComponentActivity() {
                         onReconnect = { if (canAccessLan()) transfers.reconnectSaved(it) },
                     )
                     if (pairing == TransferStatus.PermissionRequired) TransferControls(pairing)
-                    if (connected != null) {
-                        val busy = outgoing.status == TransferStatus.Preparing || outgoing.status == TransferStatus.Sending
-                        TransferControls(
-                            outgoing.status, outgoing.progress, outgoing.name,
-                            choose = if (busy) null else ({ chooseFile.launch(arrayOf("*/*")) }),
-                            cancel = if (busy) transfers::cancelUpload else null,
-                            retry = if (outgoing.status == TransferStatus.Failed || outgoing.status == TransferStatus.Canceled)
-                                transfers::retryUpload else null,
-                        )
-                    }
                 },
                 inboxActions = {
                     val paused = incoming.status == TransferStatus.Canceled || incoming.status == TransferStatus.Failed

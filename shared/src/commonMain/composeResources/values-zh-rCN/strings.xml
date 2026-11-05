@@ -35,6 +35,7 @@
     <string name="attachment_failed">传输失败，请检查连接、文件大小和可用空间。</string>
     <string name="attachment_canceled">已取消传输。</string>
     <string name="attachment_choose">选择文件或图片</string>
+    <string name="attachment_pair_required">通过 HTTPS 配对后即可发送文件或图片。</string>
     <string name="attachment_cancel">取消</string>
     <string name="attachment_retry">重试</string>
     <string name="send_to_phone">发送到手机</string>
