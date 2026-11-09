@@ -61,6 +61,10 @@
     <string name="pairing_done">完成</string>
     <string name="pairing_replacement_hint">扫码配对成功后会替换原配对。</string>
     <string name="connect_computer">连接电脑</string>
+    <string name="pairing_scan_computer_hint">在电脑上打开局域网快传并显示配对二维码，再用手机扫码连接。</string>
+    <string name="connected_computer_detail">可以与这台电脑收发文字和文件。</string>
+    <string name="pairing_address">电脑地址</string>
+    <string name="pairing_fingerprint">证书指纹</string>
     <string name="device_connected">已连接</string>
     <string name="device_disconnected">未连接</string>
     <string name="device_offline_name">%1$s · 离线</string>

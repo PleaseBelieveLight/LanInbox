@@ -8,6 +8,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 
 private val lightColors = lightColorScheme(
     primary = Color(0xFF2457C5),
@@ -41,6 +42,9 @@ private val darkColors = darkColorScheme(
 
 /** Returns the shared palette for Compose content and platform window decorations. */
 fun lanInboxColorScheme(darkTheme: Boolean): ColorScheme = if (darkTheme) darkColors else lightColors
+
+internal val ColorScheme.headerContainerColor: Color
+    get() = primaryContainer.copy(alpha = 0.55f).compositeOver(surface)
 
 @Composable
 internal fun LanInboxTheme(desktopDialogs: Boolean = false, content: @Composable () -> Unit) {

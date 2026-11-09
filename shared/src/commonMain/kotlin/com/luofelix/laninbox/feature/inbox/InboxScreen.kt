@@ -1,6 +1,5 @@
 package com.luofelix.laninbox.feature.inbox
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,20 +12,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -46,7 +39,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.luofelix.laninbox.AppDialog
+import com.luofelix.laninbox.AppDialogPanel
 import com.luofelix.laninbox.AppIcons
+import com.luofelix.laninbox.AppPopupMenu
 import com.luofelix.laninbox.LocalDesktopDialogs
 import com.luofelix.laninbox.core.network.AttachmentInfo
 import com.luofelix.laninbox.core.network.MessageKind
@@ -93,7 +88,7 @@ internal fun InboxScreen(
         val message = item.request
         AppDialog(
             onDismissRequest = { openMessage = null },
-            title = if (desktopDialogs) stringResource(Res.string.message_details) else kindLabel(message.kind),
+            title = stringResource(Res.string.message_details),
             subtitle = kindLabel(message.kind),
             icon = when (message.kind) {
                 MessageKind.Text -> AppIcons.Document
@@ -102,28 +97,15 @@ internal fun InboxScreen(
             },
             width = 680.dp,
             text = {
-                val content: @Composable () -> Unit = {
+                AppDialogPanel(padding = if (desktopDialogs) 18.dp else 16.dp) {
                     SelectionContainer {
                         Text(
                             message.content,
-                            modifier = if (desktopDialogs) {
-                                Modifier.fillMaxWidth().padding(18.dp)
-                            } else Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                            modifier = Modifier.fillMaxWidth(),
                             fontFamily = FontFamily.Monospace.takeIf { message.kind == MessageKind.Code },
-                            style = if (desktopDialogs) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyLarge,
                         )
                     }
-                }
-                if (desktopDialogs) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.background,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                        content = content,
-                    )
-                } else {
-                    content()
                 }
             },
             confirmLabel = stringResource(Res.string.copy_message),
@@ -240,24 +222,18 @@ private fun InboxMenu(label: String, action: () -> Unit) {
     val desktopDialogs = LocalDesktopDialogs.current
     Box {
         IconButton(onClick = { open = true }, modifier = Modifier.semantics { contentDescription = more }) {
-            if (desktopDialogs) Icon(AppIcons.More, null, Modifier.size(20.dp))
-            else Text("⋯", style = MaterialTheme.typography.titleLarge)
+            Icon(AppIcons.More, null, Modifier.size(20.dp))
         }
-        DropdownMenu(
+        AppPopupMenu(
             expanded = open,
             onDismissRequest = { open = false },
-            shape = if (desktopDialogs) RoundedCornerShape(14.dp) else MenuDefaults.shape,
-            containerColor = if (desktopDialogs) MaterialTheme.colorScheme.surface else MenuDefaults.containerColor,
-            border = if (desktopDialogs) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
         ) {
             DropdownMenuItem(
-                text = {
-                    Text(label, color = if (desktopDialogs) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
-                },
-                leadingIcon = if (desktopDialogs) ({
+                text = { Text(label, color = MaterialTheme.colorScheme.error) },
+                leadingIcon = {
                     Icon(AppIcons.Delete, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
-                }) else null,
-                modifier = if (desktopDialogs) Modifier.widthIn(min = 200.dp) else Modifier,
+                },
+                modifier = Modifier.widthIn(min = if (desktopDialogs) 200.dp else 216.dp).heightIn(min = 48.dp),
                 onClick = { open = false; action() },
             )
         }
