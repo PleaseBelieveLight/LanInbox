@@ -60,7 +60,7 @@ internal fun AttachmentCard(
             }
         },
         onDelete = delete?.let { { it(attachment) } },
-        leading = leading,
+        leading = leading ?: { AttachmentTypeIcon(attachment) },
     )
     if (showingPreview) {
         val scope = rememberCoroutineScope()
@@ -85,12 +85,7 @@ internal fun AttachmentCard(
             onDismissRequest = { showingPreview = false },
             title = attachment.name,
             subtitle = size,
-            icon = when (attachment.localPreviewKind()) {
-                LocalAttachmentPreviewKind.Gif -> AppIcons.Image
-                LocalAttachmentPreviewKind.Audio -> AppIcons.Music
-                LocalAttachmentPreviewKind.Video -> AppIcons.Play
-                else -> if (attachment.viewerMediaType().startsWith("image/")) AppIcons.Image else AppIcons.Document
-            },
+            icon = attachment.typeIcon(),
             width = if (canPreview) 760.dp else 480.dp,
             text = {
                 val (image, ready) = result

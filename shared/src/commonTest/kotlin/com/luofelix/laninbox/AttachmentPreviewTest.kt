@@ -6,6 +6,8 @@ import com.luofelix.laninbox.feature.inbox.viewerMediaType
 import com.luofelix.laninbox.feature.inbox.localPreviewKind
 import com.luofelix.laninbox.feature.inbox.LocalAttachmentPreviewKind
 import com.luofelix.laninbox.feature.inbox.mediaTimeLabel
+import com.luofelix.laninbox.feature.inbox.AttachmentFileKind
+import com.luofelix.laninbox.feature.inbox.fileKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -58,6 +60,33 @@ class AttachmentPreviewTest {
         }
         assertEquals("application/octet-stream", attachment("unknown.bin").viewerMediaType())
         assertEquals("text/plain", attachment("image.png", "text/plain").viewerMediaType())
+    }
+
+    @Test
+    fun distinguishesCommonFileTypesForListAndDialogIcons() {
+        mapOf(
+            "照片.GIF" to AttachmentFileKind.Image,
+            "视频.MP4" to AttachmentFileKind.Video,
+            "音乐.MP3" to AttachmentFileKind.Audio,
+            "笔记.TXT" to AttachmentFileKind.Text,
+            "config.JSON" to AttachmentFileKind.Code,
+            "report.PDF" to AttachmentFileKind.Pdf,
+            "report.DOCX" to AttachmentFileKind.Document,
+            "table.XLSX" to AttachmentFileKind.Spreadsheet,
+            "slides.PPTX" to AttachmentFileKind.Presentation,
+            "archive.7Z" to AttachmentFileKind.Archive,
+            "unknown.bin" to AttachmentFileKind.File,
+        ).forEach { (name, kind) -> assertEquals(kind, attachment(name).fileKind(), name) }
+    }
+
+    @Test
+    fun usesSpecificMimeTypesAndDoesNotMisclassifyDoubleExtensions() {
+        assertEquals(AttachmentFileKind.Text, attachment("image.png", "text/plain").fileKind())
+        assertEquals(AttachmentFileKind.Pdf, attachment("report", "APPLICATION/PDF").fileKind())
+        assertEquals(AttachmentFileKind.Archive, attachment("backup", "application/x-zip-compressed").fileKind())
+        assertEquals(AttachmentFileKind.Archive, attachment("backup.tar.gz").fileKind())
+        assertEquals(AttachmentFileKind.File, attachment("report.pdf.exe").fileKind())
+        assertEquals(AttachmentFileKind.File, attachment("notes").fileKind())
     }
 
     private fun attachment(name: String, type: String = "application/octet-stream") = AttachmentInfo(

@@ -30,6 +30,13 @@ object AppIcons {
     val Play = outline("Play", "M8 4 L20 12 L8 20 Z")
     val Pause = outline("Pause", "M8 4 V20 M16 4 V20")
     val Music = outline("Music", "M9 18 V5 L20 3 V16 M9 9 L20 7 M9 18 A3 3 0 1 1 6 15 A3 3 0 0 1 9 18 M20 16 A3 3 0 1 1 17 13 A3 3 0 0 1 20 16")
+    val Video = outline("Video", "M4 5 H20 Q21 5 21 6 V18 Q21 19 20 19 H4 Q3 19 3 18 V6 Q3 5 4 5 Z M10 9 L15 12 L10 15 Z")
+    val File = outline("File", "M5 3 H14 L19 8 V20 Q19 21 18 21 H6 Q5 21 5 20 Z M14 3 V8 H19")
+    val Pdf = outline("Pdf", "M5 3 H14 L19 8 V20 Q19 21 18 21 H6 Q5 21 5 20 Z M14 3 V8 H19 M8 17 C13 17 16 11 12 10 C9 9 10 16 16 17")
+    val Word = outline("Word", "M5 3 H14 L19 8 V20 Q19 21 18 21 H6 Q5 21 5 20 Z M14 3 V8 H19 M8 12 L10 17 L12 13 L14 17 L16 12")
+    val Spreadsheet = outline("Spreadsheet", "M4 3 H20 V21 H4 Z M4 9 H20 M4 15 H20 M10 3 V21")
+    val Presentation = outline("Presentation", "M3 4 H21 V17 H3 Z M12 17 V21 M8 21 H16 M7 13 V10 M12 13 V7 M17 13 V9")
+    val Archive = outline("Archive", "M5 3 H19 V21 H5 Z M11 3 H13 V6 H11 V9 H13 V12 H11 M10 15 H14 V18 H10 Z")
 
     private fun outline(name: String, path: String): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)

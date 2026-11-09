@@ -9,6 +9,8 @@ import android.media.MediaPlayer
 import android.net.Uri
 import android.view.Surface
 import android.view.TextureView
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -30,18 +33,25 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LifecycleStartEffect
 import com.luofelix.laninbox.feature.inbox.mediaTimeLabel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import laninbox.shared.generated.resources.Res
 import laninbox.shared.generated.resources.media_pause
 import laninbox.shared.generated.resources.media_play
@@ -55,6 +65,19 @@ internal fun AndroidMediaPreview(uri: Uri, video: Boolean, onUnavailable: () -> 
     val context = LocalContext.current
     val unavailable by rememberUpdatedState(onUnavailable)
     val playback = remember(context, uri, video) { LocalMediaPlayback(context, uri, video) { unavailable() } }
+    val poster by produceState<Pair<ImageBitmap?, Boolean>>(null to !video, context, uri, video) {
+        if (video) {
+            value = try {
+                withContext(Dispatchers.IO) { loadVideoPoster(context, uri) } to true
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                // Cover extraction is optional; a missing thumbnail must not disable video playback.
+                null to true
+            }
+        }
+    }
+    val playLabel = stringResource(Res.string.media_play)
     LifecycleStartEffect(playback) {
         playback.prepare()
         // No background playback: release the decoder and audio focus whenever this UI stops.
@@ -79,8 +102,28 @@ internal fun AndroidMediaPreview(uri: Uri, video: Boolean, onUnavailable: () -> 
                             onRelease = { it.releaseSurface(); it.keepScreenOn = false },
                         )
                     }
+                    // Keep the cover until the TextureView reports a real frame, rather than hiding it on Play.
+                    if (!playback.videoFrameRendered) {
+                        Box(
+                            Modifier.matchParentSize().clickable(
+                                enabled = playback.ready, role = Role.Button, onClick = playback::toggle,
+                            ).semantics { contentDescription = playLabel },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            poster.first?.let { Image(it, null, Modifier.matchParentSize(), contentScale = ContentScale.Fit) }
+                            if (playback.ready && poster.second) {
+                                ComposeSurface(shape = CircleShape, color = Color.Black.copy(alpha = 0.5f), contentColor = Color.White) {
+                                    Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                                        Icon(AppIcons.Play, null, Modifier.size(26.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
                 } else Icon(AppIcons.Music, null, Modifier.size(40.dp))
-                if (!playback.ready) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(28.dp))
+                if (!playback.ready || video && !playback.videoFrameRendered && !poster.second) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(28.dp))
+                }
             }
         }
         var seeking by remember(playback) { mutableStateOf(false) }
@@ -138,6 +181,8 @@ private class LocalMediaPlayback(
     var videoWidth by mutableIntStateOf(0)
         private set
     var videoHeight by mutableIntStateOf(0)
+        private set
+    var videoFrameRendered by mutableStateOf(false)
         private set
 
     fun prepare() {
@@ -218,6 +263,7 @@ private class LocalMediaPlayback(
     }
 
     fun setSurface(value: Surface?) {
+        if (surface !== value) videoFrameRendered = false
         surface = value
         try {
             player?.setSurface(value)
@@ -226,12 +272,18 @@ private class LocalMediaPlayback(
         }
     }
 
+    fun onVideoFrameRendered() {
+        // Preparation can update an empty texture; retain the cover until playback produces a frame.
+        if (ready && playing) videoFrameRendered = true
+    }
+
     fun release() {
         val media = player
         player = null
         if (ready) runCatching { positionMs = media?.currentPosition ?: positionMs }
         ready = false
         playing = false
+        videoFrameRendered = false
         media?.setOnErrorListener(null)
         media?.setOnPreparedListener(null)
         media?.setOnCompletionListener(null)
@@ -258,7 +310,7 @@ private class LocalVideoView(context: Context, private val playback: LocalMediaP
     }
 
     override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) = updateVideoSize()
-    override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
+    override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = playback.onVideoFrameRendered()
     override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
         releaseSurface()
         return true

@@ -41,6 +41,7 @@ import com.luofelix.laninbox.core.network.AttachmentInfo
 import com.luofelix.laninbox.core.network.MessageKind
 import com.luofelix.laninbox.feature.inbox.InboxMessage
 import com.luofelix.laninbox.feature.inbox.InboxScreen
+import com.luofelix.laninbox.feature.inbox.AttachmentTypeIcon
 import laninbox.shared.generated.resources.Res
 import laninbox.shared.generated.resources.app_name
 import laninbox.shared.generated.resources.back
@@ -106,7 +107,7 @@ fun AndroidHomeScreen(
                     )
                 },
                 attachmentIcon = { attachment ->
-                    InboxTypeIcon(if (attachment.mediaType.startsWith("image/")) AppIcons.Image else AppIcons.Document)
+                    AttachmentTypeIcon(attachment)
                 },
             )
         }
