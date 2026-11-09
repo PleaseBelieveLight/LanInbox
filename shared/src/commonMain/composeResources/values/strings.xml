@@ -72,6 +72,11 @@
     <string name="send_as_text">Use automatic format</string>
     <string name="draft_too_long">This text is too long. Send a shorter excerpt or a file.</string>
     <string name="message_copied">Copied</string>
+    <string name="message_details">Message details</string>
+    <string name="pairing_same_network">Keep your phone and computer on the same local network.</string>
+    <string name="pairing_ready">Ready to pair</string>
+    <string name="pairing_saved">Pairing saved</string>
+    <string name="pairing_connection_settings">Device and connection</string>
     <string name="close">Close</string>
     <string name="more">More</string>
     <string name="preview_unavailable">Preview unavailable. You can still save the file.</string>

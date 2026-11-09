@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
 
-internal object AppIcons {
+object AppIcons {
     val Back = outline("Back", "M19 12 H5 M12 19 L5 12 L12 5")
     val Close = outline("Close", "M6 6 L18 18 M6 18 L18 6")
     val More = outline("More", "M12 5 H12.1 M12 12 H12.1 M12 19 H12.1")
@@ -21,6 +21,12 @@ internal object AppIcons {
     val Code = outline("Code", "M8 6 L2 12 L8 18 M16 6 L22 12 L16 18 M14 4 L10 20")
     val Send = outline("Send", "M21 3 L10 14 M21 3 L14 21 L10 14 L3 10 Z")
     val Retry = outline("Retry", "M20 4 V10 H14 M20 10 A8 8 0 1 0 19 17")
+    val Phone = outline("Phone", "M8 2 H16 Q18 2 18 4 V20 Q18 22 16 22 H8 Q6 22 6 20 V4 Q6 2 8 2 Z M10 5 H14 M11 19 H13")
+    val Check = outline("Check", "M5 12 L10 17 L19 7")
+    val Delete = outline("Delete", "M3 6 H21 M9 6 V3 H15 V6 M5 6 L6 21 H18 L19 6 M10 10 V17 M14 10 V17")
+    val Unlink = outline("Unlink", "M8 3 L5 6 M16 21 L19 18 M9 15 L7 17 A3 3 0 0 1 2.8 12.8 L6.5 9.1 M15 9 L17 7 A3 3 0 0 1 21.2 11.2 L17.5 14.9 M3 3 L21 21")
+    val ChevronDown = outline("ChevronDown", "M6 9 L12 15 L18 9")
+    val ChevronUp = outline("ChevronUp", "M6 15 L12 9 L18 15")
 
     private fun outline(name: String, path: String): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)

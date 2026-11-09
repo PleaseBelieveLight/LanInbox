@@ -1,5 +1,6 @@
 package com.luofelix.laninbox.feature.inbox
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,19 +9,24 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,6 +45,9 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.luofelix.laninbox.AppDialog
+import com.luofelix.laninbox.AppIcons
+import com.luofelix.laninbox.LocalDesktopDialogs
 import com.luofelix.laninbox.core.network.AttachmentInfo
 import com.luofelix.laninbox.core.network.MessageKind
 import kotlinx.coroutines.launch
@@ -67,45 +76,63 @@ internal fun InboxScreen(
     var confirmingClear by remember { mutableStateOf(false) }
     var openMessage by remember { mutableStateOf<InboxMessage?>(null) }
     val hasHistory = messages.isNotEmpty() || attachments.isNotEmpty()
+    val desktopDialogs = LocalDesktopDialogs.current
     if (confirmingClear && clearHistory != null) {
-        AlertDialog(
+        AppDialog(
             onDismissRequest = { confirmingClear = false },
-            title = { Text(stringResource(Res.string.history_clear)) },
+            title = stringResource(Res.string.history_clear),
+            icon = AppIcons.Delete,
             text = { Text(stringResource(Res.string.history_clear_confirmation)) },
-            confirmButton = {
-                TextButton(onClick = { confirmingClear = false; clearHistory() }) {
-                    Text(stringResource(Res.string.history_clear))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmingClear = false }) { Text(stringResource(Res.string.attachment_cancel)) }
-            },
+            confirmLabel = stringResource(Res.string.history_clear),
+            onConfirm = { confirmingClear = false; clearHistory() },
+            dismissLabel = stringResource(Res.string.attachment_cancel),
+            destructive = true,
         )
     }
     openMessage?.let { item ->
         val message = item.request
-        AlertDialog(
+        AppDialog(
             onDismissRequest = { openMessage = null },
-            title = { Text(kindLabel(message.kind)) },
+            title = if (desktopDialogs) stringResource(Res.string.message_details) else kindLabel(message.kind),
+            subtitle = kindLabel(message.kind),
+            icon = when (message.kind) {
+                MessageKind.Text -> AppIcons.Document
+                MessageKind.Link -> AppIcons.Link
+                MessageKind.Code -> AppIcons.Code
+            },
+            width = 680.dp,
             text = {
-                SelectionContainer {
-                    Text(
-                        message.content,
-                        modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
-                        fontFamily = FontFamily.Monospace.takeIf { message.kind == MessageKind.Code },
+                val content: @Composable () -> Unit = {
+                    SelectionContainer {
+                        Text(
+                            message.content,
+                            modifier = if (desktopDialogs) {
+                                Modifier.fillMaxWidth().padding(18.dp)
+                            } else Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                            fontFamily = FontFamily.Monospace.takeIf { message.kind == MessageKind.Code },
+                            style = if (desktopDialogs) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+                if (desktopDialogs) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.background,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        content = content,
                     )
+                } else {
+                    content()
                 }
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    clipboard.setText(AnnotatedString(message.content))
-                    openMessage = null
-                    scope.launch { snackbar.showSnackbar(copiedLabel) }
-                }) { Text(stringResource(Res.string.copy_message)) }
+            confirmLabel = stringResource(Res.string.copy_message),
+            onConfirm = {
+                clipboard.setText(AnnotatedString(message.content))
+                openMessage = null
+                scope.launch { snackbar.showSnackbar(copiedLabel) }
             },
-            dismissButton = {
-                TextButton(onClick = { openMessage = null }) { Text(stringResource(Res.string.close)) }
-            },
+            dismissLabel = stringResource(Res.string.close),
         )
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -210,13 +237,27 @@ internal fun InboxRow(
 private fun InboxMenu(label: String, action: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     val more = stringResource(Res.string.more)
+    val desktopDialogs = LocalDesktopDialogs.current
     Box {
         IconButton(onClick = { open = true }, modifier = Modifier.semantics { contentDescription = more }) {
-            Text("⋯", style = MaterialTheme.typography.titleLarge)
+            if (desktopDialogs) Icon(AppIcons.More, null, Modifier.size(20.dp))
+            else Text("⋯", style = MaterialTheme.typography.titleLarge)
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            shape = if (desktopDialogs) RoundedCornerShape(14.dp) else MenuDefaults.shape,
+            containerColor = if (desktopDialogs) MaterialTheme.colorScheme.surface else MenuDefaults.containerColor,
+            border = if (desktopDialogs) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
+        ) {
             DropdownMenuItem(
-                text = { Text(label) },
+                text = {
+                    Text(label, color = if (desktopDialogs) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+                },
+                leadingIcon = if (desktopDialogs) ({
+                    Icon(AppIcons.Delete, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                }) else null,
+                modifier = if (desktopDialogs) Modifier.widthIn(min = 200.dp) else Modifier,
                 onClick = { open = false; action() },
             )
         }

@@ -1,9 +1,21 @@
 package com.luofelix.laninbox.feature.inbox
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -13,9 +25,14 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.luofelix.laninbox.core.network.AttachmentInfo
+import com.luofelix.laninbox.AppDialog
+import com.luofelix.laninbox.AppIcons
+import com.luofelix.laninbox.LocalDesktopDialogs
 import com.luofelix.laninbox.feature.send.fileSizeLabel
 import laninbox.shared.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -47,22 +64,48 @@ internal fun AttachmentCard(
         val result by produceState<Pair<ImageBitmap?, Boolean>>(null to false, attachment) {
             value = preview(attachment) to true
         }
-        AlertDialog(
+        val desktopDialogs = LocalDesktopDialogs.current
+        AppDialog(
             onDismissRequest = { showingPreview = false },
-            title = { Text(attachment.name) },
+            title = attachment.name,
+            subtitle = size,
+            icon = AppIcons.Image,
+            width = 760.dp,
             text = {
                 val (image, ready) = result
-                when {
-                    image != null -> Image(
-                        image, attachment.name, modifier = Modifier.sizeIn(maxWidth = 420.dp, maxHeight = 320.dp),
-                    )
-                    ready -> Text(stringResource(Res.string.preview_unavailable))
-                    else -> CircularProgressIndicator()
+                if (desktopDialogs) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.background,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    ) {
+                        Box(Modifier.fillMaxWidth().height(320.dp).padding(16.dp), contentAlignment = Alignment.Center) {
+                            when {
+                                image != null -> Image(image, attachment.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                                ready -> Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    Icon(AppIcons.Image, null, Modifier.size(36.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(stringResource(Res.string.preview_unavailable), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                else -> CircularProgressIndicator(Modifier.size(32.dp), strokeWidth = 3.dp)
+                            }
+                        }
+                    }
+                } else {
+                    when {
+                        image != null -> Image(
+                            image, attachment.name, modifier = Modifier.sizeIn(maxWidth = 420.dp, maxHeight = 320.dp),
+                        )
+                        ready -> Text(stringResource(Res.string.preview_unavailable))
+                        else -> CircularProgressIndicator()
+                    }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showingPreview = false }) { Text(stringResource(Res.string.close)) }
-            },
+            confirmLabel = stringResource(Res.string.close),
+            onConfirm = { showingPreview = false },
         )
     }
 }

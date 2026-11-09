@@ -43,7 +43,7 @@ fun App(
     inboxStatus: @Composable () -> Unit = {},
     composer: @Composable () -> Unit = {},
 ) {
-    LanInboxTheme {
+    LanInboxTheme(desktopDialogs = true) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(modifier = Modifier.safeContentPadding().imePadding()) {
                 Surface(color = MaterialTheme.colorScheme.surface) {

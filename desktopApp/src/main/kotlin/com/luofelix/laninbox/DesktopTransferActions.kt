@@ -1,21 +1,8 @@
 package com.luofelix.laninbox
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -26,18 +13,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposeWindow
-import androidx.compose.ui.draganddrop.awtTransferable
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
-import androidx.compose.ui.unit.dp
 import com.luofelix.laninbox.core.logging.AppLogger
-import com.luofelix.laninbox.core.network.PairingInvitation
-import com.luofelix.laninbox.core.network.SECURE_PORT
-import com.luofelix.laninbox.core.network.privateLanAuthority
 import com.luofelix.laninbox.feature.send.SelectedFile
 import com.luofelix.laninbox.feature.send.SendComposer
 import com.luofelix.laninbox.feature.send.TransferFeedback
@@ -52,7 +33,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import laninbox.shared.generated.resources.*
@@ -219,7 +199,7 @@ internal fun DesktopSendComposer(
         onSubmit = if (receiverReady && paired) state::send else onConnect,
         connectRequired = !receiverReady || !paired,
         modifier = Modifier.dragAndDropTarget(
-            shouldStartDragAndDrop = { dropTarget.accepts(it.awtTransferable, it.action) },
+            shouldStartDragAndDrop = dropTarget::accepts,
             target = dropTarget,
         ),
         enabled = enabled,
@@ -254,161 +234,6 @@ internal fun DesktopSendComposer(
         } else null
         val canCancel = active != null || preparation == TransferStatus.Preparing
         TransferFeedback(status, progress, cancel = state::cancel.takeIf { canCancel })
-    }
-}
-
-@Composable
-internal fun DesktopConnection(
-    shown: Boolean,
-    onOpen: () -> Unit,
-    onClose: () -> Unit,
-    receiverReady: Boolean,
-    host: String?,
-    fingerprint: String,
-    pairedSession: Long?,
-    pairing: DesktopPairingSession,
-    state: DesktopTransferState,
-    deviceName: String,
-    onDeviceName: (String) -> Unit,
-) {
-    val paired = pairedSession != null
-    val connectedSession by pairing.connectedSession.collectAsState()
-    val connected = receiverReady && paired && connectedSession == pairedSession
-    val confirmedPairing by pairing.confirmedPairing.collectAsState()
-    var acknowledgedPairing by remember(pairing) { mutableStateOf<Long?>(null) }
-    val pairingSucceeded = connected && confirmedPairing != null && confirmedPairing == pairedSession &&
-        confirmedPairing != acknowledgedPairing
-    OutlinedButton(onClick = onOpen) {
-        Text(
-            stringResource(
-                when {
-                    connected -> Res.string.connected_phone
-                    paired -> Res.string.paired_phone
-                    else -> Res.string.connect_phone
-                },
-            ),
-        )
-    }
-
-    val code by pairing.invitation.collectAsState()
-    LaunchedEffect(code) {
-        code?.let {
-            delay(DesktopPairingSession.INVITATION_LIFETIME)
-            pairing.expireInvitation(it)
-        }
-    }
-    if (!shown) return
-
-    val address = host?.let { "$it:$SECURE_PORT" }
-    val qrAddress = address?.let { privateLanAuthority(it, SECURE_PORT) }
-    val invitation = code
-    var replacingPairing by remember(pairedSession) { mutableStateOf(false) }
-    var details by remember { mutableStateOf(false) }
-    var confirmingForget by remember { mutableStateOf(false) }
-    var name by remember(deviceName) { mutableStateOf(deviceName) }
-    LaunchedEffect(receiverReady, address, paired) {
-        if (receiverReady && address != null && !paired && pairing.invitation.value == null) pairing.issueInvitation()
-    }
-    val qr = remember(invitation, qrAddress, fingerprint) {
-        if (invitation != null && qrAddress != null) pairingQr(PairingInvitation(qrAddress, fingerprint, invitation))
-        else null
-    }
-    fun closeConnection() {
-        if (pairingSucceeded) acknowledgedPairing = confirmedPairing
-        onClose()
-    }
-    AlertDialog(
-        onDismissRequest = ::closeConnection,
-        title = {
-            Text(stringResource(when {
-                pairingSucceeded -> Res.string.pairing_success
-                connected -> Res.string.connected_phone
-                paired -> Res.string.paired_phone
-                else -> Res.string.connect_phone
-            }))
-        },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (replacingPairing && !pairingSucceeded) Text(stringResource(Res.string.pairing_replacement_hint))
-                when {
-                    pairingSucceeded -> Text(stringResource(Res.string.pairing_success_detail))
-                    paired && !replacingPairing -> {
-                        Text(stringResource(if (connected) Res.string.connected_phone_detail else Res.string.paired_phone_detail))
-                        Button(
-                            enabled = receiverReady && address != null,
-                            onClick = {
-                                replacingPairing = true
-                                pairing.issueInvitation()
-                            },
-                        ) { Text(stringResource(Res.string.pairing_again)) }
-                        if (!receiverReady || address == null) {
-                            Text(stringResource(Res.string.pairing_no_address))
-                        }
-                    }
-                    !receiverReady || qrAddress == null -> Text(stringResource(Res.string.pairing_no_address))
-                    qr != null -> {
-                        Text(stringResource(Res.string.pairing_scan_hint))
-                        Image(qr, stringResource(Res.string.pairing_scan_title), Modifier.size(184.dp).align(Alignment.CenterHorizontally))
-                    }
-                    else -> {
-                        Text(stringResource(Res.string.pairing_qr_expired))
-                        Button(onClick = pairing::issueInvitation) { Text(stringResource(Res.string.pairing_refresh)) }
-                    }
-                }
-                if (!pairingSucceeded) {
-                    TextButton(onClick = { details = !details }) { Text(stringResource(Res.string.pairing_details)) }
-                }
-                if (details && !pairingSucceeded) {
-                    OutlinedTextField(
-                        name, { name = it.take(40) }, label = { Text(stringResource(Res.string.device_name)) },
-                        singleLine = true, modifier = Modifier.fillMaxWidth(),
-                    )
-                    if (name.isNotBlank() && name.trim() != deviceName) {
-                        TextButton(onClick = { onDeviceName(name.trim()) }) { Text(stringResource(Res.string.save_device_name)) }
-                    }
-                    address?.let { value ->
-                        SelectionContainer { Text("${stringResource(Res.string.receiver_address)}\n$value") }
-                    }
-                    if (fingerprint.isNotEmpty()) {
-                        SelectionContainer { Text("${stringResource(Res.string.secure_fingerprint)}\n$fingerprint") }
-                    }
-                    if (!paired || replacingPairing) {
-                        invitation?.let { value ->
-                            SelectionContainer { Text("${stringResource(Res.string.secure_invitation)}\n$value") }
-                        }
-                        if (receiverReady && qrAddress == null && address != null) {
-                            TextButton(onClick = pairing::issueInvitation) { Text(stringResource(Res.string.pairing_issue_invitation)) }
-                        }
-                    }
-                    if (paired) {
-                        TextButton(onClick = { confirmingForget = true }) { Text(stringResource(Res.string.pairing_revoke)) }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = ::closeConnection) {
-                Text(stringResource(if (pairingSucceeded) Res.string.pairing_done else Res.string.close))
-            }
-        },
-    )
-    if (confirmingForget && !pairingSucceeded) {
-        AlertDialog(
-            onDismissRequest = { confirmingForget = false },
-            title = { Text(stringResource(Res.string.pairing_confirm_forget)) },
-            text = { Text(stringResource(Res.string.pairing_confirm_forget_detail)) },
-            confirmButton = {
-                TextButton(onClick = { confirmingForget = false; state.revoke() }) {
-                    Text(stringResource(Res.string.pairing_revoke))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmingForget = false }) { Text(stringResource(Res.string.attachment_cancel)) }
-            },
-        )
     }
 }
 

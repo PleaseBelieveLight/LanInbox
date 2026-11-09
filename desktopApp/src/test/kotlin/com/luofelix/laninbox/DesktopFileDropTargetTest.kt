@@ -5,9 +5,14 @@ import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTransferAction
 import androidx.compose.ui.geometry.Offset
 import com.luofelix.laninbox.core.logging.AppLogger
+import java.awt.Point
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
 import java.awt.datatransfer.Transferable
+import java.awt.dnd.DnDConstants
+import java.awt.dnd.DropTarget
+import java.awt.dnd.DropTargetDragEvent
+import java.awt.dnd.DropTargetDropEvent
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -73,6 +78,49 @@ class DesktopFileDropTargetTest {
     }
 
     @Test
+    fun nativeMoveRequestAttachesAsCopyBeforeReadingThePayload() = withDirectory { directory ->
+        val path = Files.writeString(directory.resolve("附件.txt"), "文件内容")
+        val selected = mutableListOf<Path>()
+        val target = target(onFile = selected::add)
+        var acceptedAction: Int? = null
+        val transfer = payload {
+            assertEquals(DnDConstants.ACTION_COPY, acceptedAction)
+            listOf(path.toFile())
+        }
+        val native = object : DropTargetDropEvent(
+            DropTarget().dropTargetContext, Point(), DnDConstants.ACTION_MOVE, DnDConstants.ACTION_COPY_OR_MOVE,
+        ) {
+            override fun getTransferable(): Transferable = transfer
+            override fun acceptDrop(dropAction: Int) {
+                acceptedAction = dropAction
+            }
+        }
+        val event = DragAndDropEvent(DragAndDropTransferAction.Move, native, Offset.Zero)
+
+        assertTrue(target.accepts(event))
+        assertTrue(target.onDrop(event))
+        assertEquals(DnDConstants.ACTION_COPY, acceptedAction)
+        assertEquals(listOf(path), selected)
+        assertEquals("文件内容", Files.readString(path))
+    }
+
+    @Test
+    fun nativeMoveOnlySourceIsRejectedWithoutReadingOrAcceptingTheDrop() {
+        val target = target(onFile = { error("Must not select a file") })
+        val native = object : DropTargetDropEvent(
+            DropTarget().dropTargetContext, Point(), DnDConstants.ACTION_MOVE, DnDConstants.ACTION_MOVE,
+        ) {
+            override fun getTransferable(): Transferable = error("Must not read the payload")
+            override fun acceptDrop(dropAction: Int) = error("Must not accept a move-only source")
+        }
+        val event = DragAndDropEvent(DragAndDropTransferAction.Move, native, Offset.Zero)
+
+        assertFalse(target.accepts(event))
+        assertFalse(target.onDrop(event))
+        assertNull(target.error)
+    }
+
+    @Test
     fun disabledComposerDoesNotReadOrReplaceTheFile() {
         var enabled = true
         val target = target(isEnabled = { enabled }, onFile = { error("Must not select a file") })
@@ -111,8 +159,9 @@ class DesktopFileDropTargetTest {
     @Test
     fun highlightClearsOnExitEndAndActionChange() {
         val target = target()
-        val copy = DragAndDropEvent(DragAndDropTransferAction.Copy, null, Offset.Zero)
-        val move = DragAndDropEvent(DragAndDropTransferAction.Move, null, Offset.Zero)
+        val copy = dragEvent(DnDConstants.ACTION_COPY)
+        val move = dragEvent(DnDConstants.ACTION_MOVE)
+        val defaultMove = dragEvent(DnDConstants.ACTION_MOVE, DnDConstants.ACTION_COPY_OR_MOVE)
         target.onEntered(copy)
         assertTrue(target.hovered)
         target.onExited(copy)
@@ -125,6 +174,19 @@ class DesktopFileDropTargetTest {
         assertFalse(target.hovered)
         target.onChanged(copy)
         assertTrue(target.hovered)
+        target.onChanged(defaultMove)
+        assertTrue(target.hovered)
+    }
+
+    private fun dragEvent(action: Int, sourceActions: Int = action): DragAndDropEvent {
+        val transfer = payload { error("Must not read the payload while hovering") }
+        val native = object : DropTargetDragEvent(DropTarget().dropTargetContext, Point(), action, sourceActions) {
+            override fun getTransferable(): Transferable = transfer
+        }
+        val composeAction = if (action == DnDConstants.ACTION_COPY) {
+            DragAndDropTransferAction.Copy
+        } else DragAndDropTransferAction.Move
+        return DragAndDropEvent(composeAction, native, Offset.Zero)
     }
 
     private fun target(isEnabled: () -> Boolean = { true }, onFile: (Path) -> Unit = {}) =
