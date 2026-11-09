@@ -58,6 +58,7 @@ fun AndroidHomeScreen(
     clearHistory: (() -> Unit)? = null,
     openAttachment: (suspend (AttachmentInfo) -> Boolean)? = null,
     localAttachmentPreview: (@Composable (AttachmentInfo, () -> Unit) -> Unit)? = null,
+    attachmentReceivedDates: Map<String, String> = emptyMap(),
     device: @Composable () -> Unit = {},
     inboxStatus: @Composable () -> Unit = {},
     composer: @Composable () -> Unit = {},
@@ -94,6 +95,7 @@ fun AndroidHomeScreen(
                 clearHistory = clearHistory,
                 openAttachment = openAttachment,
                 localAttachmentPreview = localAttachmentPreview,
+                attachmentReceivedDates = attachmentReceivedDates,
                 status = inboxStatus,
                 modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)
                     .padding(start = 16.dp, end = 16.dp, top = 12.dp),

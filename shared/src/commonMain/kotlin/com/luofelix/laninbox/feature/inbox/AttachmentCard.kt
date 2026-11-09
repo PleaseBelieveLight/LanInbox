@@ -46,6 +46,7 @@ internal fun AttachmentCard(
     leading: (@Composable () -> Unit)? = null,
     open: (suspend (AttachmentInfo) -> Boolean)? = null,
     localPreview: (@Composable (AttachmentInfo, () -> Unit) -> Unit)? = null,
+    receivedDate: String? = null,
 ) {
     var showingPreview by remember { mutableStateOf(false) }
     val canPreview = attachment.canPreviewImage() && preview != null
@@ -54,13 +55,10 @@ internal fun AttachmentCard(
         title = attachment.name,
         subtitle = if (canPreview) stringResource(Res.string.preview_image, size) else size,
         onOpen = { showingPreview = true },
-        action = {
-            export?.let { save ->
-                TextButton(onClick = { save(attachment) }) { Text(stringResource(Res.string.attachment_save)) }
-            }
-        },
+        onSave = export?.let { save -> { save(attachment) } },
         onDelete = delete?.let { { it(attachment) } },
         leading = leading ?: { AttachmentTypeIcon(attachment) },
+        receivedDate = receivedDate?.let { stringResource(Res.string.attachment_received_on, it) },
     )
     if (showingPreview) {
         val scope = rememberCoroutineScope()

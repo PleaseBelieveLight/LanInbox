@@ -24,6 +24,8 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -35,6 +37,9 @@ internal class AndroidTransferFiles(private val application: Application) {
     private val inbox = File(application.filesDir, "secure-inbox")
     private val resolver = application.contentResolver
     private val historyLock = Mutex()
+    private val receivedDates = MutableStateFlow<Map<String, Long>>(emptyMap())
+    /** Local receipt times in epoch milliseconds, refreshed with the latest [recent] snapshot. */
+    val receivedAt = receivedDates.asStateFlow()
 
     suspend fun describe(uri: Uri): SelectedFile = withContext(Dispatchers.IO) {
         val fields = arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE)
@@ -88,14 +93,21 @@ internal class AndroidTransferFiles(private val application: Application) {
     }
 
     suspend fun recent(): List<OutboundDelivery> = withContext(Dispatchers.IO) {
-        inbox.listFiles().orEmpty()
-            .filter { it.extension == "json" }
-            .filter { !File(inbox, "${it.nameWithoutExtension}.deleted").exists() }
-            .sortedByDescending { it.lastModified() }
-            .asSequence()
-            .mapNotNull(::readRecord)
-            .take(100)
-            .toList()
+        historyLock.withLock {
+            val recent = inbox.listFiles().orEmpty()
+                .filter { it.extension == "json" }
+                .filter { !File(inbox, "${it.nameWithoutExtension}.deleted").exists() }
+                .sortedByDescending { it.lastModified() }
+                .asSequence()
+                .mapNotNull { file -> readRecord(file)?.let { it to file.lastModified() } }
+                .take(100)
+                .toList()
+            // Receipts are written after verification and are not rewritten for replays or exports.
+            receivedDates.value = recent.mapNotNull { (delivery, timestamp) ->
+                delivery.attachment?.let { it.id to timestamp }
+            }.toMap().filterValues { it > 0 }
+            recent.map { it.first }
+        }
     }
 
     suspend fun receive(client: SecureLanClient, delivery: OutboundDelivery, progress: (Long) -> Unit) =

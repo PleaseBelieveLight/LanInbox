@@ -38,6 +38,7 @@ object AppIcons {
     val Presentation = outline("Presentation", "M3 4 H21 V17 H3 Z M12 17 V21 M8 21 H16 M7 13 V10 M12 13 V7 M17 13 V9")
     val Archive = outline("Archive", "M5 3 H19 V21 H5 Z M11 3 H13 V6 H11 V9 H13 V12 H11 M10 15 H14 V18 H10 Z")
     val Inbox = outline("Inbox", "M3 12 L7 5 H17 L21 12 V19 H3 Z M3 12 H8 L10 15 H14 L16 12 H21")
+    val Download = outline("Download", "M12 3 V15 M7 10 L12 15 L17 10 M4 16 V21 H20 V16")
 
     private fun outline(name: String, path: String): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)

@@ -19,6 +19,7 @@
     <string name="pairing_revoke">忘记手机</string>
     <string name="attachment_bytes">%1$d 字节</string>
     <string name="attachment_save">另存为</string>
+    <string name="attachment_received_on">收于 %1$s</string>
     <string name="attachment_preparing">正在准备文件…</string>
     <string name="attachment_receiving">正在接收…</string>
     <string name="attachment_failed">传输失败，可以重试。</string>

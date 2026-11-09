@@ -26,6 +26,8 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
+import java.util.Locale
+import java.util.TimeZone
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -68,6 +70,12 @@ fun main() = application {
     var discoveredAddress by remember { mutableStateOf<String?>(null) }
     val attachmentStore = remember { DesktopAttachmentStore(dataDirectory.resolve("development-attachments")) }
     val attachments by attachmentStore.attachments.collectAsState()
+    val attachmentReceivedAt by attachmentStore.receivedAt.collectAsState()
+    val locale = Locale.getDefault()
+    val timeZone = TimeZone.getDefault()
+    val receivedDateLabels = remember(attachmentReceivedAt, locale, timeZone.id) {
+        attachmentReceivedAt.mapValues { formatReceivedDateTime(it.value, locale, timeZone) }
+    }
     val outbox = remember { DesktopOutbox() }
     var fingerprint by remember { mutableStateOf("") }
     var status by remember { mutableStateOf(ReceiverStatus.Disabled) }
@@ -193,6 +201,7 @@ fun main() = application {
         App(
             messages = messages,
             attachments = attachments,
+            attachmentReceivedDates = receivedDateLabels,
             previewAttachment = { desktopPreview(attachmentStore.payload(it)) },
             openAttachment = { openDesktopAttachment(window, attachmentStore.payload(it), it, logger) },
             deleteMessage = { changeHistory { inbox.delete(it.request) } },

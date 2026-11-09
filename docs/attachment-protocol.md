@@ -35,6 +35,12 @@ files. Completed uploads live under `%LOCALAPPDATA%/LanInbox/development-attachm
 on Windows. Storage paths are derived from the validated ID. The inbox uses the name and media
 type for display, previews, and export.
 
+The inbox displays local receipt completion dates in the device's locale and time zone.
+These dates come from the existing immutable receipt timestamps (Android JSON records and
+Windows receipt files), so replays and exports keep the original received date. Timestamp
+metadata stays local and does not add fields to the wire contract. Clearing history removes
+the displayed date along with the entry while preserving deduplication receipts.
+
 ## Opening received files
 
 Every received attachment opens a details dialog. Both platforms preview supported still images.

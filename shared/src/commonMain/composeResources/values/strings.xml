@@ -19,6 +19,7 @@
     <string name="pairing_revoke">Forget phone</string>
     <string name="attachment_bytes">%1$d bytes</string>
     <string name="attachment_save">Save as</string>
+    <string name="attachment_received_on">Received %1$s</string>
     <string name="attachment_preparing">Preparing the file…</string>
     <string name="attachment_receiving">Receiving…</string>
     <string name="attachment_failed">Transfer failed. You can retry.</string>

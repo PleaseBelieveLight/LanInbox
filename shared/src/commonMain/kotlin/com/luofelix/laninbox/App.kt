@@ -41,6 +41,7 @@ fun App(
     clearHistory: (() -> Unit)? = null,
     openAttachment: (suspend (AttachmentInfo) -> Boolean)? = null,
     localAttachmentPreview: (@Composable (AttachmentInfo, () -> Unit) -> Unit)? = null,
+    attachmentReceivedDates: Map<String, String> = emptyMap(),
     device: @Composable () -> Unit = {},
     inboxStatus: @Composable () -> Unit = {},
     composer: @Composable () -> Unit = {},
@@ -79,6 +80,7 @@ fun App(
                             clearHistory = clearHistory,
                             openAttachment = openAttachment,
                             localAttachmentPreview = localAttachmentPreview,
+                            attachmentReceivedDates = attachmentReceivedDates,
                             status = inboxStatus,
                             modifier = modifier,
                         )

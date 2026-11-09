@@ -36,6 +36,9 @@ internal class DesktopAttachmentStore(
     private val publication = Mutex()
     private val history = MutableStateFlow<List<AttachmentInfo>>(emptyList())
     val attachments = history.asStateFlow()
+    private val receivedDates = MutableStateFlow<Map<String, Long>>(emptyMap())
+    /** Local completion times in epoch milliseconds; replays leave the original receipt time unchanged. */
+    val receivedAt = receivedDates.asStateFlow()
 
     fun payload(attachment: AttachmentInfo): Path {
         require(attachment.isValid())
@@ -45,7 +48,7 @@ internal class DesktopAttachmentStore(
     suspend fun initialize() = withContext(Dispatchers.IO) {
         if (Files.isDirectory(root)) {
             val staleBefore = Instant.now().minus(1, ChronoUnit.DAYS)
-            history.value = Files.list(root).use { entries ->
+            val restored = Files.list(root).use { entries ->
                 entries.filter { Files.isDirectory(it) }.filter {
                     if (it.fileName.toString().startsWith(".upload-")) {
                         if (Files.getLastModifiedTime(it).toInstant().isBefore(staleBefore)) {
@@ -60,6 +63,10 @@ internal class DesktopAttachmentStore(
                     .toList()
                     .filterNotNull()
             }
+            receivedDates.value = restored.associate {
+                it.id to Files.getLastModifiedTime(root.resolve(it.id).resolve("receipt")).toMillis()
+            }.filterValues { it > 0 }
+            history.value = restored
         }
     }
 
@@ -76,6 +83,7 @@ internal class DesktopAttachmentStore(
             for (item in candidates) {
                 Files.deleteIfExists(payload(item))
                 history.value = history.value.filterNot { it.id == item.id }
+                receivedDates.value = receivedDates.value - item.id
             }
         }
     }
@@ -122,6 +130,8 @@ internal class DesktopAttachmentStore(
             }
 
             Files.write(receipt, listOf(request.size.toString(), request.sha256, request.name, request.mediaType))
+            // The immutable receipt records local completion time, independent of retries and external copies.
+            val receivedAtMillis = Files.getLastModifiedTime(receipt).toMillis()
             return publication.withLock {
                 currentCoroutineContext().ensureActive()
                 val target = root.resolve(request.id)
@@ -135,7 +145,10 @@ internal class DesktopAttachmentStore(
                 } else {
                     // Publish the payload and receipt together on the same filesystem.
                     Files.move(staging, target, ATOMIC_MOVE)
-                    history.value = (listOf(request) + history.value).take(100)
+                    val recent = (listOf(request) + history.value).take(100)
+                    val ids = recent.mapTo(mutableSetOf()) { it.id }
+                    receivedDates.value = (receivedDates.value + (request.id to receivedAtMillis)).filterKeys { it in ids }
+                    history.value = recent
                     AttachmentResult.Created
                 }
             }

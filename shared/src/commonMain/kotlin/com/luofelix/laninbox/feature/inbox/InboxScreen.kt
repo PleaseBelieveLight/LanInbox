@@ -71,6 +71,7 @@ internal fun InboxScreen(
     attachmentIcon: (@Composable (AttachmentInfo) -> Unit)? = null,
     openAttachment: (suspend (AttachmentInfo) -> Boolean)? = null,
     localAttachmentPreview: (@Composable (AttachmentInfo, () -> Unit) -> Unit)? = null,
+    attachmentReceivedDates: Map<String, String> = emptyMap(),
 ) {
     val clipboard = LocalClipboardManager.current
     val snackbar = remember { SnackbarHostState() }
@@ -139,7 +140,7 @@ internal fun InboxScreen(
                 overflow = TextOverflow.Ellipsis,
             )
             if (clearHistory != null && hasHistory) {
-                InboxMenu(stringResource(Res.string.history_clear)) { confirmingClear = true }
+                InboxMenu(stringResource(Res.string.history_clear), action = { confirmingClear = true })
             }
         }
         status()
@@ -169,6 +170,7 @@ internal fun InboxScreen(
                     leading = if (attachmentIcon != null) ({ attachmentIcon(attachment) }) else null,
                     open = openAttachment,
                     localPreview = localAttachmentPreview,
+                    receivedDate = attachmentReceivedDates[attachment.id],
                 )
             }
         }
@@ -223,9 +225,11 @@ internal fun InboxRow(
     subtitle: String,
     code: Boolean = false,
     onOpen: (() -> Unit)?,
-    action: @Composable () -> Unit,
+    action: @Composable () -> Unit = {},
     onDelete: (() -> Unit)?,
     leading: (@Composable () -> Unit)? = null,
+    onSave: (() -> Unit)? = null,
+    receivedDate: String? = null,
 ) {
     Row(
         Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -249,18 +253,29 @@ internal fun InboxRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
+            receivedDate?.let {
+                Text(
+                    it,
+                    modifier = Modifier.padding(top = 2.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
         action()
-        onDelete?.let { InboxMenu(stringResource(Res.string.history_delete), it) }
+        if (onSave != null || onDelete != null) {
+            InboxMenu(stringResource(Res.string.history_delete), action = onDelete, onSave = onSave)
+        }
     }
     HorizontalDivider()
 }
 
 @Composable
-private fun InboxMenu(label: String, action: () -> Unit) {
+private fun InboxMenu(label: String, action: (() -> Unit)?, onSave: (() -> Unit)? = null) {
     var open by remember { mutableStateOf(false) }
     val more = stringResource(Res.string.more)
     val desktopDialogs = LocalDesktopDialogs.current
+    val itemModifier = Modifier.widthIn(min = if (desktopDialogs) 200.dp else 216.dp).heightIn(min = 48.dp)
     Box {
         IconButton(onClick = { open = true }, modifier = Modifier.semantics { contentDescription = more }) {
             Icon(AppIcons.More, null, Modifier.size(20.dp))
@@ -269,14 +284,27 @@ private fun InboxMenu(label: String, action: () -> Unit) {
             expanded = open,
             onDismissRequest = { open = false },
         ) {
-            DropdownMenuItem(
-                text = { Text(label, color = MaterialTheme.colorScheme.error) },
-                leadingIcon = {
-                    Icon(AppIcons.Delete, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
-                },
-                modifier = Modifier.widthIn(min = if (desktopDialogs) 200.dp else 216.dp).heightIn(min = 48.dp),
-                onClick = { open = false; action() },
-            )
+            onSave?.let { save ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(Res.string.attachment_save)) },
+                    leadingIcon = { Icon(AppIcons.Download, null, Modifier.size(18.dp)) },
+                    modifier = itemModifier,
+                    onClick = { open = false; save() },
+                )
+                if (action != null) {
+                    HorizontalDivider(Modifier.padding(horizontal = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                }
+            }
+            action?.let { delete ->
+                DropdownMenuItem(
+                    text = { Text(label, color = MaterialTheme.colorScheme.error) },
+                    leadingIcon = {
+                        Icon(AppIcons.Delete, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                    },
+                    modifier = itemModifier,
+                    onClick = { open = false; delete() },
+                )
+            }
         }
     }
 }

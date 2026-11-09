@@ -51,6 +51,8 @@ import com.luofelix.laninbox.feature.send.DevelopmentMessageSender
 import com.luofelix.laninbox.feature.send.MessageSender
 import com.luofelix.laninbox.feature.send.TransferFeedback
 import com.luofelix.laninbox.feature.send.TransferStatus
+import java.util.Locale
+import java.util.TimeZone
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -134,6 +136,12 @@ class MainActivity : ComponentActivity() {
         val outgoing by transfers.outgoing.collectAsStateWithLifecycle()
         val incoming by transfers.incoming.collectAsStateWithLifecycle()
         val inbox by transfers.inbox.collectAsStateWithLifecycle()
+        val attachmentReceivedAt by transfers.files.receivedAt.collectAsStateWithLifecycle()
+        val locale = Locale.getDefault()
+        val timeZone = TimeZone.getDefault()
+        val receivedDateLabels = remember(attachmentReceivedAt, locale, timeZone.id) {
+            attachmentReceivedAt.mapValues { formatReceivedDateTime(it.value, locale, timeZone) }
+        }
         val inboxFailure by transfers.inboxOperationFailed.collectAsStateWithLifecycle()
         var showConnection by rememberSaveable { mutableStateOf(false) }
         var scanning by rememberSaveable { mutableStateOf(false) }
@@ -179,6 +187,7 @@ class MainActivity : ComponentActivity() {
             AndroidHomeScreen(
                 messages = inbox.mapNotNull { it.message?.let(::InboxMessage) },
                 attachments = inbox.mapNotNull { it.attachment },
+                attachmentReceivedDates = receivedDateLabels,
                 previewAttachment = transfers.files::preview,
                 exportAttachment = ::exportAttachment,
                 openAttachment = { openAttachment(it, openWithLabel) },
