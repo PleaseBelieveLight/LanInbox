@@ -55,6 +55,8 @@ fun AndroidHomeScreen(
     deleteMessage: ((InboxMessage) -> Unit)? = null,
     deleteAttachment: ((AttachmentInfo) -> Unit)? = null,
     clearHistory: (() -> Unit)? = null,
+    openAttachment: (suspend (AttachmentInfo) -> Boolean)? = null,
+    localAttachmentPreview: (@Composable (AttachmentInfo, () -> Unit) -> Unit)? = null,
     device: @Composable () -> Unit = {},
     inboxStatus: @Composable () -> Unit = {},
     composer: @Composable () -> Unit = {},
@@ -89,6 +91,8 @@ fun AndroidHomeScreen(
                 deleteMessage = deleteMessage,
                 deleteAttachment = deleteAttachment,
                 clearHistory = clearHistory,
+                openAttachment = openAttachment,
+                localAttachmentPreview = localAttachmentPreview,
                 status = inboxStatus,
                 modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)
                     .padding(start = 16.dp, end = 16.dp, top = 12.dp),

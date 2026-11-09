@@ -51,6 +51,7 @@ fun AppDialog(
     destructive: Boolean = false,
     subtitle: String? = null,
     width: Dp = 480.dp,
+    confirmEnabled: Boolean = true,
     text: @Composable () -> Unit,
 ) {
     val desktop = LocalDesktopDialogs.current
@@ -98,7 +99,8 @@ fun AppDialog(
                                 AppDialogButton(it, onDismissRequest, Modifier.widthIn(min = 88.dp), secondary = true)
                             }
                             AppDialogButton(
-                                confirmLabel, onConfirm, Modifier.widthIn(min = 100.dp), destructive = destructive,
+                                confirmLabel, onConfirm, Modifier.widthIn(min = 100.dp),
+                                destructive = destructive, enabled = confirmEnabled,
                             )
                         }
                     } else {
@@ -109,7 +111,10 @@ fun AppDialog(
                             dismissLabel?.let {
                                 AppDialogButton(it, onDismissRequest, Modifier.weight(1f), secondary = true)
                             }
-                            AppDialogButton(confirmLabel, onConfirm, Modifier.weight(1f), destructive = destructive)
+                            AppDialogButton(
+                                confirmLabel, onConfirm, Modifier.weight(1f),
+                                destructive = destructive, enabled = confirmEnabled,
+                            )
                         }
                     }
                 }

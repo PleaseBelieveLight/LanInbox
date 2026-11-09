@@ -194,6 +194,7 @@ fun main() = application {
             messages = messages,
             attachments = attachments,
             previewAttachment = { desktopPreview(attachmentStore.payload(it)) },
+            openAttachment = { openDesktopAttachment(window, attachmentStore.payload(it), it, logger) },
             deleteMessage = { changeHistory { inbox.delete(it.request) } },
             deleteAttachment = { changeHistory { attachmentStore.delete(it) } },
             clearHistory = { changeHistory { inbox.delete(null); attachmentStore.delete(null) } },

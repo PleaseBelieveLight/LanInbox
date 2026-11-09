@@ -7,6 +7,7 @@ import android.provider.OpenableColumns
 import android.util.AtomicFile
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.content.FileProvider
 import com.luofelix.laninbox.core.network.AttachmentInfo
 import com.luofelix.laninbox.core.network.MAX_ATTACHMENT_BYTES
 import com.luofelix.laninbox.core.network.MAX_REQUEST_BYTES
@@ -15,6 +16,7 @@ import com.luofelix.laninbox.core.network.OutboundDelivery
 import com.luofelix.laninbox.core.network.attachmentMediaType
 import com.luofelix.laninbox.core.network.safeAttachmentName
 import com.luofelix.laninbox.feature.send.SelectedFile
+import com.luofelix.laninbox.feature.inbox.AttachmentTextPreview
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -181,6 +183,17 @@ internal class AndroidTransferFiles(private val application: Application) {
     suspend fun export(attachment: AttachmentInfo, uri: Uri) = withContext(Dispatchers.IO) {
         val output = resolver.openOutputStream(uri, "w") ?: throw IOException("Could not open save destination")
         output.use { destination -> payload(attachment).inputStream().use { it.copyTo(destination) } }
+    }
+
+    /** Returns the original display name with a content URI; callers must grant temporary read access. */
+    suspend fun openUri(attachment: AttachmentInfo): Uri = withContext(Dispatchers.IO) {
+        val file = payload(attachment)
+        if (!file.isFile || file.length() != attachment.size) throw IOException("Attachment is unavailable")
+        FileProvider.getUriForFile(application, "${application.packageName}.attachments", file, attachment.name)
+    }
+
+    suspend fun textPreview(attachment: AttachmentInfo): AttachmentTextPreview = withContext(Dispatchers.IO) {
+        payload(attachment).inputStream().use(::readAttachmentTextPreview)
     }
 
     private fun payload(attachment: AttachmentInfo): File {

@@ -27,6 +27,9 @@ object AppIcons {
     val Unlink = outline("Unlink", "M8 3 L5 6 M16 21 L19 18 M9 15 L7 17 A3 3 0 0 1 2.8 12.8 L6.5 9.1 M15 9 L17 7 A3 3 0 0 1 21.2 11.2 L17.5 14.9 M3 3 L21 21")
     val ChevronDown = outline("ChevronDown", "M6 9 L12 15 L18 9")
     val ChevronUp = outline("ChevronUp", "M6 15 L12 9 L18 15")
+    val Play = outline("Play", "M8 4 L20 12 L8 20 Z")
+    val Pause = outline("Pause", "M8 4 V20 M16 4 V20")
+    val Music = outline("Music", "M9 18 V5 L20 3 V16 M9 9 L20 7 M9 18 A3 3 0 1 1 6 15 A3 3 0 0 1 9 18 M20 16 A3 3 0 1 1 17 13 A3 3 0 0 1 20 16")
 
     private fun outline(name: String, path: String): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)

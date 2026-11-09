@@ -39,6 +39,8 @@ fun App(
     deleteMessage: ((InboxMessage) -> Unit)? = null,
     deleteAttachment: ((AttachmentInfo) -> Unit)? = null,
     clearHistory: (() -> Unit)? = null,
+    openAttachment: (suspend (AttachmentInfo) -> Boolean)? = null,
+    localAttachmentPreview: (@Composable (AttachmentInfo, () -> Unit) -> Unit)? = null,
     device: @Composable () -> Unit = {},
     inboxStatus: @Composable () -> Unit = {},
     composer: @Composable () -> Unit = {},
@@ -75,6 +77,8 @@ fun App(
                             deleteMessage = deleteMessage,
                             deleteAttachment = deleteAttachment,
                             clearHistory = clearHistory,
+                            openAttachment = openAttachment,
+                            localAttachmentPreview = localAttachmentPreview,
                             status = inboxStatus,
                             modifier = modifier,
                         )

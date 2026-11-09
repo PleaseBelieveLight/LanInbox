@@ -83,7 +83,15 @@
     <string name="pairing_connection_settings">Device and connection</string>
     <string name="close">Close</string>
     <string name="more">More</string>
-    <string name="preview_unavailable">Preview unavailable. You can still save the file.</string>
+    <string name="preview_unavailable">Preview is currently unavailable. Open this file with another app.</string>
+    <string name="attachment_open_with">Open with</string>
+    <string name="attachment_opening">Opening…</string>
+    <string name="media_play">Play</string>
+    <string name="media_pause">Pause</string>
+    <string name="media_seek">Playback position</string>
+    <string name="text_preview_empty">This text file is empty.</string>
+    <string name="text_preview_truncated">Showing the first 64K characters. Open with another app to read the complete file.</string>
+    <string name="attachment_open_failed">Could not open the file. Install a compatible app or save the file and try again.</string>
     <string name="preview_image">%1$s · Preview image</string>
     <string name="pairing_scan_hint">Open LanInbox on your phone and tap Scan to connect.</string>
     <string name="pairing_refresh">Refresh QR code</string>

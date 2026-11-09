@@ -63,6 +63,8 @@ internal fun InboxScreen(
     modifier: Modifier = Modifier,
     messageIcon: (@Composable (MessageKind) -> Unit)? = null,
     attachmentIcon: (@Composable (AttachmentInfo) -> Unit)? = null,
+    openAttachment: (suspend (AttachmentInfo) -> Boolean)? = null,
+    localAttachmentPreview: (@Composable (AttachmentInfo, () -> Unit) -> Unit)? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     val snackbar = remember { SnackbarHostState() }
@@ -160,6 +162,8 @@ internal fun InboxScreen(
                 AttachmentCard(
                     attachment, previewAttachment, exportAttachment, deleteAttachment,
                     leading = if (attachmentIcon != null) ({ attachmentIcon(attachment) }) else null,
+                    open = openAttachment,
+                    localPreview = localAttachmentPreview,
                 )
             }
         }

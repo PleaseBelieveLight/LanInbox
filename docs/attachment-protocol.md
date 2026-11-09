@@ -35,6 +35,28 @@ files. Completed uploads live under `%LOCALAPPDATA%/LanInbox/development-attachm
 on Windows. Storage paths are derived from the validated ID. The inbox uses the name and media
 type for display, previews, and export.
 
+## Opening received files
+
+Every received attachment opens a details dialog. Both platforms preview supported still images.
+Android also displays GIF animation, plays local MP4/video and MP3/audio through the platform
+decoder with pause and seek controls, and displays selectable TXT text. Previews read only
+received local content. Unsupported codecs, other formats, and failed decodes offer **Open with**.
+Generic MIME metadata is supplemented by a filename hint for common formats without changing
+the received metadata or the transfer contract.
+
+Android releases media decoders and audio focus when the dialog closes or the UI stops, and
+restores the playback position when the UI starts again. Text previews recognize UTF-8,
+BOM-marked UTF-16, and legacy GB18030 text. They read at most 256 KiB plus a BOM allowance,
+display up to 65,536 characters, and identify truncated previews. Android 7/8 use a bounded legacy
+GIF decoder; newer versions decode sampled animation frames through `ImageDecoder`.
+
+Android launches a system app chooser with temporary, read-only access to the selected payload
+through a non-exported `FileProvider`. The original filename is supplied as the display name.
+Windows opens its native **Open with** dialog using a temporary copy with the original name and
+extension, so external editors cannot modify the verified inbox payload. These temporary copies
+are scheduled for deletion when the desktop JVM exits; files still held by external applications
+may remain in the system temporary directory.
+
 ## Windows to Android
 
 The foreground Android client polls `GET /v1/outbox` with the pairing credential. It receives

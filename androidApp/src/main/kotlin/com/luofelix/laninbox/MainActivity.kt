@@ -2,6 +2,7 @@ package com.luofelix.laninbox
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.ClipData
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
@@ -44,6 +45,7 @@ import com.luofelix.laninbox.core.network.AttachmentInfo
 import com.luofelix.laninbox.core.network.PairingInvitation
 import com.luofelix.laninbox.feature.inbox.InboxMessage
 import com.luofelix.laninbox.feature.inbox.InboxOperationError
+import com.luofelix.laninbox.feature.inbox.viewerMediaType
 import com.luofelix.laninbox.feature.send.DeliveryResult
 import com.luofelix.laninbox.feature.send.DevelopmentMessageSender
 import com.luofelix.laninbox.feature.send.MessageSender
@@ -52,6 +54,7 @@ import com.luofelix.laninbox.feature.send.TransferStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import laninbox.shared.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -172,11 +175,21 @@ class MainActivity : ComponentActivity() {
             val secureSender = remember(client) {
                 client?.let { paired -> MessageSender { _, message -> paired.sendMessage(message) } }
             }
+            val openWithLabel = stringResource(Res.string.attachment_open_with)
             AndroidHomeScreen(
                 messages = inbox.mapNotNull { it.message?.let(::InboxMessage) },
                 attachments = inbox.mapNotNull { it.attachment },
                 previewAttachment = transfers.files::preview,
                 exportAttachment = ::exportAttachment,
+                openAttachment = { openAttachment(it, openWithLabel) },
+                localAttachmentPreview = { attachment, onUnavailable ->
+                    AndroidLocalAttachmentPreview(
+                        attachment = attachment,
+                        loadUri = { transfers.files.openUri(attachment) },
+                        loadText = { transfers.files.textPreview(attachment) },
+                        onUnavailable = onUnavailable,
+                    )
+                },
                 deleteMessage = { transfers.deleteHistory(it.request.messageId) },
                 deleteAttachment = { transfers.deleteHistory(it.id) },
                 clearHistory = { transfers.deleteHistory(null) },
@@ -354,6 +367,26 @@ class MainActivity : ComponentActivity() {
     private fun exportAttachment(attachment: AttachmentInfo) {
         transfers.selectExport(attachment)
         saveFile.launch(attachment.name)
+    }
+
+    private suspend fun openAttachment(attachment: AttachmentInfo, chooserTitle: String): Boolean {
+        return try {
+            val uri = transfers.files.openUri(attachment)
+            val mediaType = attachment.viewerMediaType().takeUnless { it == "application/octet-stream" } ?: "*/*"
+            val viewer = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mediaType)
+                // Grant only this received payload, for the lifetime of the selected viewer's task.
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                clipData = ClipData.newRawUri("attachment", uri)
+            }
+            startActivity(Intent.createChooser(viewer, chooserTitle))
+            true
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            androidLogger.warn("Attachment viewer failed", "attachmentId" to attachment.id, "type" to error.javaClass.simpleName)
+            false
+        }
     }
 
     private fun requestLanAccess() {
