@@ -3,6 +3,7 @@ package com.luofelix.laninbox.feature.inbox
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,7 +13,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -20,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +41,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.luofelix.laninbox.AppDialog
@@ -120,27 +126,26 @@ internal fun InboxScreen(
         )
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 stringResource(Res.string.tab_inbox),
                 Modifier.weight(1f),
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             if (clearHistory != null && hasHistory) {
                 InboxMenu(stringResource(Res.string.history_clear)) { confirmingClear = true }
             }
         }
         status()
-        LazyColumn(Modifier.weight(1f)) {
-            if (!hasHistory) {
-                item {
-                    Text(
-                        stringResource(Res.string.inbox_empty),
-                        modifier = Modifier.padding(vertical = 16.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+        if (!hasHistory) {
+            InboxEmptyState(Modifier.weight(1f).fillMaxWidth())
+        } else LazyColumn(Modifier.weight(1f)) {
             items(messages, key = { "message:${it.request.senderId}:${it.request.messageId}" }) { item ->
                 val message = item.request
                 InboxRow(
@@ -168,6 +173,38 @@ internal fun InboxScreen(
             }
         }
         SnackbarHost(snackbar)
+    }
+}
+
+@Composable
+private fun InboxEmptyState(modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    BoxWithConstraints(
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        // Read the outer constraints before Column introduces another layout DSL receiver.
+        val showIcon = maxHeight >= 120.dp
+        Column(
+            modifier = Modifier.widthIn(max = 280.dp).verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // Leave space for the hint when the keyboard or a small window reduces the inbox height.
+            if (showIcon) {
+                Surface(shape = RoundedCornerShape(16.dp), color = colors.surfaceVariant, contentColor = colors.primary) {
+                    Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+                        Icon(AppIcons.Inbox, null, Modifier.size(28.dp))
+                    }
+                }
+            }
+            Text(
+                stringResource(Res.string.inbox_empty),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 
