@@ -13,6 +13,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.luofelix.laninbox.AppIcons
 import com.luofelix.laninbox.core.network.AttachmentInfo
+import laninbox.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 internal fun AttachmentInfo.typeIcon(): ImageVector = when (fileKind()) {
     AttachmentFileKind.Image -> AppIcons.Image
@@ -27,6 +29,23 @@ internal fun AttachmentInfo.typeIcon(): ImageVector = when (fileKind()) {
     AttachmentFileKind.Archive -> AppIcons.Archive
     AttachmentFileKind.File -> AppIcons.File
 }
+
+@Composable
+internal fun AttachmentInfo.typeLabel(): String = stringResource(
+    when (fileKind()) {
+        AttachmentFileKind.Image -> Res.string.attachment_pick_image
+        AttachmentFileKind.Video -> Res.string.attachment_type_video
+        AttachmentFileKind.Audio -> Res.string.attachment_type_audio
+        AttachmentFileKind.Text -> Res.string.kind_text
+        AttachmentFileKind.Code -> Res.string.kind_code
+        AttachmentFileKind.Pdf -> Res.string.attachment_type_pdf
+        AttachmentFileKind.Document -> Res.string.attachment_pick_document
+        AttachmentFileKind.Spreadsheet -> Res.string.attachment_type_spreadsheet
+        AttachmentFileKind.Presentation -> Res.string.attachment_type_presentation
+        AttachmentFileKind.Archive -> Res.string.attachment_type_archive
+        AttachmentFileKind.File -> Res.string.attachment_pick_file
+    },
+)
 
 @Composable
 internal fun AttachmentTypeIcon(attachment: AttachmentInfo) {

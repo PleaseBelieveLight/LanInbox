@@ -10,12 +10,15 @@ import com.sun.jna.WString
 import com.sun.jna.platform.win32.COM.COMUtils
 import com.sun.jna.platform.win32.COM.Unknown
 import com.sun.jna.platform.win32.Guid.GUID
+import com.sun.jna.platform.win32.KnownFolders
 import com.sun.jna.platform.win32.Ole32
+import com.sun.jna.platform.win32.Shell32Util
 import com.sun.jna.platform.win32.WTypes.CLSCTX_INPROC_SERVER
 import com.sun.jna.platform.win32.WinDef.HWND
 import com.sun.jna.platform.win32.WinNT.HRESULT
 import com.sun.jna.ptr.IntByReference
 import com.sun.jna.ptr.PointerByReference
+import com.sun.jna.win32.StdCallLibrary
 import java.awt.FileDialog
 import java.io.File
 import java.nio.file.Path
@@ -37,15 +40,20 @@ internal class DesktopFileFilter private constructor(val label: String, val exte
     }
 }
 
-/** Returns a selected path, or null on cancellation, without blocking Compose's event thread. */
+/**
+ * Returns a selected path, or null on cancellation, without blocking Compose's event thread.
+ * [startInPictures] opens the current Windows Pictures folder instead of the remembered location.
+ */
 internal suspend fun chooseDesktopPath(
     window: ComposeWindow,
     mode: Int,
     logger: AppLogger,
     name: String? = null,
     filter: DesktopFileFilter? = null,
+    startInPictures: Boolean = false,
 ): Path? = withContext(Dispatchers.Swing) {
     require(mode == FileDialog.LOAD || mode == FileDialog.SAVE)
+    var initialDirectory: Path? = null
     if (Platform.isWindows()) {
         try {
             val owner = HWND(Native.getWindowPointer(window))
@@ -54,7 +62,8 @@ internal suspend fun chooseDesktopPath(
                 Thread(task, "LanInbox-file-dialog").apply { isDaemon = true }
             }.asCoroutineDispatcher().use { dispatcher ->
                 return@withContext withContext(dispatcher) {
-                    withWindowsFileDialog(mode, name, filter) { dialog ->
+                    withWindowsFileDialog(mode, name, filter, startInPictures) { dialog ->
+                        if (startInPictures) initialDirectory = dialog.folderPath()
                         if (dialog.show(owner)) dialog.selectedPath() else null
                     }
                 }
@@ -71,6 +80,11 @@ internal suspend fun chooseDesktopPath(
     val picker = FileDialog(window, null, mode)
     try {
         picker.file = name
+        if (startInPictures) {
+            val pictures = initialDirectory ?: Path.of(System.getProperty("user.home"), "Pictures")
+                .takeIf { it.toFile().isDirectory }
+            picker.directory = pictures?.toString()
+        }
         if (filter != null) {
             picker.setFilenameFilter { directory, file ->
                 File(directory, file).isDirectory || filter.accepts(file)
@@ -90,6 +104,7 @@ internal fun <T> withWindowsFileDialog(
     mode: Int,
     name: String? = null,
     filter: DesktopFileFilter? = null,
+    startInPictures: Boolean = false,
     action: (WindowsFileDialog) -> T,
 ): T {
     require(mode == FileDialog.LOAD || mode == FileDialog.SAVE)
@@ -115,6 +130,10 @@ internal fun <T> withWindowsFileDialog(
             dialog.options = dialog.options or 0x40 // FOS_FORCEFILESYSTEM: callers need a real Path.
             if (name != null) dialog.setFileName(name)
             if (filter != null) dialog.setFileFilter(filter)
+            if (startInPictures) {
+                // Query the current known-folder path so relocated and OneDrive folders are respected.
+                dialog.setFolder(Path.of(Shell32Util.getKnownFolderPath(KnownFolders.FOLDERID_Pictures)))
+            }
             return action(dialog)
         } finally {
             dialog.Release()
@@ -143,6 +162,25 @@ internal class WindowsFileDialog(pointer: Pointer) : Unknown(pointer) {
         COMUtils.checkRC(invoke(15, WString(name))) // IFileDialog::SetFileName
     }
 
+    /** Overrides Windows' remembered location for this dialog without changing system folder settings. */
+    fun setFolder(directory: Path) {
+        val result = PointerByReference()
+        COMUtils.checkRC(
+            FileDialogShell.instance.SHCreateItemFromParsingName(
+                WString(directory.toAbsolutePath().toString()), null,
+                GUID("{43826D1E-E718-42EE-BC55-A1E261C37BFE}"), // IID_IShellItem
+                result,
+            ),
+        )
+        val item = WindowsShellItem(result.value)
+        try {
+            // SetDefaultFolder yields to the last-used location; the Pictures action must always start here.
+            COMUtils.checkRC(invoke(12, item.pointer)) // IFileDialog::SetFolder
+        } finally {
+            item.Release()
+        }
+    }
+
     fun setFileFilter(filter: DesktopFileFilter) {
         // Keep the UTF-16 strings and their structure alive until the dialog is released.
         val spec = WindowsFilterSpec().apply {
@@ -161,9 +199,14 @@ internal class WindowsFileDialog(pointer: Pointer) : Unknown(pointer) {
         return true
     }
 
-    fun selectedPath(): Path {
+    /** Returns the current folder, including the initial folder before the dialog is shown. */
+    fun folderPath(): Path = shellItemPath(13) // IFileDialog::GetFolder
+
+    fun selectedPath(): Path = shellItemPath(20) // IFileDialog::GetResult
+
+    private fun shellItemPath(slot: Int): Path {
         val result = PointerByReference()
-        COMUtils.checkRC(invoke(20, result)) // IFileDialog::GetResult
+        COMUtils.checkRC(invoke(slot, result))
         val item = WindowsShellItem(result.value)
         try {
             return item.path()
@@ -174,6 +217,19 @@ internal class WindowsFileDialog(pointer: Pointer) : Unknown(pointer) {
 
     private fun invoke(slot: Int, vararg arguments: Any): HRESULT =
         _invokeNativeObject(slot, arrayOf(pointer, *arguments), HRESULT::class.java) as HRESULT
+}
+
+private interface FileDialogShell : StdCallLibrary {
+    fun SHCreateItemFromParsingName(
+        path: WString,
+        bindingContext: Pointer?,
+        interfaceId: GUID,
+        result: PointerByReference,
+    ): HRESULT
+
+    companion object {
+        val instance: FileDialogShell by lazy { Native.load("shell32", FileDialogShell::class.java) }
+    }
 }
 
 @Structure.FieldOrder("name", "patterns")

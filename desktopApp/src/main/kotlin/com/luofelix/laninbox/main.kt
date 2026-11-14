@@ -241,8 +241,8 @@ fun main() = application {
                 if (status == ReceiverStatus.Failed) Text(stringResource(Res.string.receiver_failed))
                 if (exportFailed) InboxOperationError()
             },
-            composer = {
-                DesktopSendComposer(window, ready, pairedSession != null, outbox, transferState, logger) {
+            composer = { modifier ->
+                DesktopSendComposer(window, ready, pairedSession != null, outbox, transferState, logger, modifier) {
                     showConnection = true
                 }
             },

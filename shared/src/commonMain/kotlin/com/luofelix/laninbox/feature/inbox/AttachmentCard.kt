@@ -53,10 +53,13 @@ internal fun AttachmentCard(
     var showingPreview by remember { mutableStateOf(false) }
     val canPreview = attachment.canPreviewImage() && preview != null
     val size = fileSizeLabel(attachment.size)
+    val desktop = LocalDesktopDialogs.current
+    val metadata = if (desktop) stringResource(Res.string.attachment_metadata, size, attachment.typeLabel()) else size
     InboxRow(
         title = attachment.name,
         subtitle = when {
-            receivedDate != null -> stringResource(Res.string.attachment_metadata, size, receivedDate)
+            receivedDate != null -> stringResource(Res.string.attachment_metadata, metadata, receivedDate)
+            desktop -> metadata
             canPreview -> stringResource(Res.string.preview_image, size)
             else -> size
         },

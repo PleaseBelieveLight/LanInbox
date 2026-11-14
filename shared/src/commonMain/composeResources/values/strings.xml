@@ -3,6 +3,9 @@
     <string name="tab_send">Send</string>
     <string name="tab_inbox">Inbox</string>
     <string name="send_draft">Enter text or paste a link</string>
+    <string name="send_content_hint">Text, links, or a single file</string>
+    <string name="send_shortcut">Ctrl + Enter to send</string>
+    <string name="send_ready">Ready to send</string>
     <string name="composer_expand">Expand composer and attachment options</string>
     <string name="composer_collapse">Collapse composer</string>
     <string name="inbox_empty">Received text and files will appear here.</string>
@@ -22,6 +25,12 @@
     <string name="attachment_bytes">%1$d bytes</string>
     <string name="attachment_save">Save as</string>
     <string name="attachment_metadata">%1$s · %2$s</string>
+    <string name="attachment_type_video">Video</string>
+    <string name="attachment_type_audio">Audio</string>
+    <string name="attachment_type_pdf">PDF</string>
+    <string name="attachment_type_spreadsheet">Spreadsheet</string>
+    <string name="attachment_type_presentation">Presentation</string>
+    <string name="attachment_type_archive">Archive</string>
     <string name="attachment_preparing">Preparing the file…</string>
     <string name="attachment_receiving">Receiving…</string>
     <string name="attachment_failed">Transfer failed. You can retry.</string>

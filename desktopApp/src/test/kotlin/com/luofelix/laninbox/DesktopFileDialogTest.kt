@@ -8,13 +8,17 @@ import com.sun.jna.Pointer
 import com.sun.jna.platform.win32.COM.COMException
 import com.sun.jna.platform.win32.COM.COMUtils
 import com.sun.jna.platform.win32.COM.Unknown
+import com.sun.jna.platform.win32.KnownFolders
 import com.sun.jna.platform.win32.Ole32
+import com.sun.jna.platform.win32.Shell32Util
 import com.sun.jna.platform.win32.WinDef.HWND
 import com.sun.jna.platform.win32.WinNT.HRESULT
 import com.sun.jna.ptr.IntByReference
 import com.sun.jna.ptr.PointerByReference
 import com.sun.jna.win32.StdCallLibrary.StdCallCallback
 import java.awt.FileDialog
+import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -42,6 +46,40 @@ class DesktopFileDialogTest {
             COMUtils.checkRC(DialogInspection(dialog.pointer).getFileTypeIndex(index))
             assertEquals(1, index.value)
             assertTrue(dialog.options and 0x1000 != 0) // FOS_FILEMUSTEXIST
+        }
+    }
+
+    @Test
+    fun imageDialogStartsInTheCurrentWindowsPicturesFolder() {
+        assumeTrue(Platform.isWindows())
+        withWindowsFileDialog(
+            FileDialog.LOAD, filter = DesktopFileFilter.images("图片"), startInPictures = true,
+        ) { dialog ->
+            val pictures = Path.of(Shell32Util.getKnownFolderPath(KnownFolders.FOLDERID_Pictures))
+            assertEquals(pictures.toRealPath(), dialog.folderPath().toRealPath())
+            val index = IntByReference()
+            COMUtils.checkRC(DialogInspection(dialog.pointer).getFileTypeIndex(index))
+            assertEquals(1, index.value)
+        }
+    }
+
+    @Test
+    fun explicitFolderOverridesThePreviousLocationAndPreservesUnicodePaths() {
+        assumeTrue(Platform.isWindows())
+        val root = Files.createTempDirectory("laninbox-dialog-folder-")
+        val first = Files.createDirectory(root.resolve("先前目录"))
+        val pictures = Files.createDirectory(root.resolve("图片 中文 空格"))
+        try {
+            withWindowsFileDialog(FileDialog.LOAD) { dialog ->
+                dialog.setFolder(first)
+                assertEquals(first.toRealPath(), dialog.folderPath().toRealPath())
+                dialog.setFolder(pictures)
+                assertEquals(pictures.toRealPath(), dialog.folderPath().toRealPath())
+            }
+        } finally {
+            Files.deleteIfExists(pictures)
+            Files.deleteIfExists(first)
+            Files.deleteIfExists(root)
         }
     }
 

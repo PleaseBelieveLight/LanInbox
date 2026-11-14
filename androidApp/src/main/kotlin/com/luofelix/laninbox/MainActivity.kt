@@ -100,6 +100,7 @@ class MainActivity : ComponentActivity() {
             val client = DevelopmentMessageSender()
             developmentSender = client
             MessageSender { address, message ->
+
                 if (hasLanPermission()) client.send(address, message)
                 else DeliveryResult.PermissionRequired
             }

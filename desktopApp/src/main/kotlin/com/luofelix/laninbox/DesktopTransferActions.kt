@@ -1,6 +1,12 @@
 package com.luofelix.laninbox
 
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,11 +19,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import com.luofelix.laninbox.core.logging.AppLogger
 import com.luofelix.laninbox.feature.send.SelectedFile
 import com.luofelix.laninbox.feature.send.SendComposer
@@ -140,6 +151,7 @@ internal fun DesktopSendComposer(
     outbox: DesktopOutbox,
     state: DesktopTransferState,
     logger: AppLogger,
+    modifier: Modifier = Modifier,
     onConnect: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -172,13 +184,15 @@ internal fun DesktopSendComposer(
         delivered?.let(state::complete)
     }
     val imageFilter = DesktopFileFilter.images(stringResource(Res.string.attachment_pick_image))
-    fun chooseFile(filter: DesktopFileFilter? = null) {
+    fun chooseFile(filter: DesktopFileFilter? = null, startInPictures: Boolean = false) {
         if (!enabled) return
         choosingFile = true
         dropTarget.clearError()
         scope.launch {
             try {
-                chooseDesktopPath(window, FileDialog.LOAD, logger, filter = filter)?.let(state::selectFile)
+                chooseDesktopPath(
+                    window, FileDialog.LOAD, logger, filter = filter, startInPictures = startInPictures,
+                )?.let(state::selectFile)
             } finally {
                 choosingFile = false
             }
@@ -191,37 +205,48 @@ internal fun DesktopSendComposer(
         onDraftChange = state::editDraft,
         file = source?.let { SelectedFile(it.fileName.toString(), size) },
         onChooseFile = { chooseFile() },
-        onChooseImage = { chooseFile(imageFilter) },
+        onChooseImage = { chooseFile(imageFilter, startInPictures = true) },
         onRemove = {
             dropTarget.clearError()
             state.selectFile(null)
         },
         onSubmit = if (receiverReady && paired) state::send else onConnect,
         connectRequired = !receiverReady || !paired,
-        modifier = Modifier.dragAndDropTarget(
+        modifier = modifier.dragAndDropTarget(
             shouldStartDragAndDrop = dropTarget::accepts,
             target = dropTarget,
         ),
         enabled = enabled,
         failed = preparation == TransferStatus.Failed,
         highlighted = hovered,
+        fillAvailableHeight = true,
+        hint = {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite },
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(AppIcons.File, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    stringResource(
+                        when {
+                            hovered -> Res.string.attachment_drop_here
+                            dropTarget.error == FileDropError.SingleFileRequired -> Res.string.attachment_drop_single
+                            dropTarget.error == FileDropError.UnreadableFile -> Res.string.attachment_drop_unreadable
+                            else -> Res.string.attachment_drop_hint
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (!hovered && dropTarget.error != null) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+        },
     ) {
-        Text(
-            stringResource(
-                when {
-                    hovered -> Res.string.attachment_drop_here
-                    dropTarget.error == FileDropError.SingleFileRequired -> Res.string.attachment_drop_single
-                    dropTarget.error == FileDropError.UnreadableFile -> Res.string.attachment_drop_unreadable
-                    else -> Res.string.attachment_drop_hint
-                },
-            ),
-            style = MaterialTheme.typography.bodySmall,
-            color = if (!hovered && dropTarget.error != null) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
         val status = when {
             active != null && !active.offered -> TransferStatus.Waiting
             active != null -> TransferStatus.Sending
@@ -233,7 +258,15 @@ internal fun DesktopSendComposer(
             if (attachment.size == 0L) 1f else (active.transferred.toDouble() / attachment.size).toFloat().coerceIn(0f, 1f)
         } else null
         val canCancel = active != null || preparation == TransferStatus.Preparing
-        TransferFeedback(status, progress, cancel = state::cancel.takeIf { canCancel })
+        if (status == null) {
+            Text(
+                stringResource(Res.string.send_ready),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            TransferFeedback(status, progress, cancel = state::cancel.takeIf { canCancel })
+        }
     }
 }
 

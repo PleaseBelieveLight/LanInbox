@@ -3,6 +3,9 @@
     <string name="tab_send">发送</string>
     <string name="tab_inbox">收件箱</string>
     <string name="send_draft">输入文字或粘贴链接</string>
+    <string name="send_content_hint">文字、链接，或单个文件</string>
+    <string name="send_shortcut">Ctrl + Enter 发送</string>
+    <string name="send_ready">准备发送</string>
     <string name="composer_expand">展开输入框和附件选项</string>
     <string name="composer_collapse">收起发送区</string>
     <string name="inbox_empty">收到的文字和文件会出现在这里。</string>
@@ -22,6 +25,12 @@
     <string name="attachment_bytes">%1$d 字节</string>
     <string name="attachment_save">另存为</string>
     <string name="attachment_metadata">%1$s · %2$s</string>
+    <string name="attachment_type_video">视频</string>
+    <string name="attachment_type_audio">音频</string>
+    <string name="attachment_type_pdf">PDF</string>
+    <string name="attachment_type_spreadsheet">表格</string>
+    <string name="attachment_type_presentation">演示文稿</string>
+    <string name="attachment_type_archive">压缩包</string>
     <string name="attachment_preparing">正在准备文件…</string>
     <string name="attachment_receiving">正在接收…</string>
     <string name="attachment_failed">传输失败，可以重试。</string>
