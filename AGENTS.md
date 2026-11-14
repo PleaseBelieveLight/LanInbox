@@ -50,6 +50,27 @@ Check available RAM before builds or other memory-intensive tasks. If memory is 
 completed background processes you started. If headroom remains insufficient, skip the task and
 report which command still needs to run.
 
+## AI Verification and Manual Acceptance
+
+- By default, leave visual appearance, interaction experience, screenshot comparisons, and
+  device checks to the user. Also leave APK and MSI builds, installation, and launch checks to
+  the user. Do not start apps or emulators, capture screenshots, or run full builds and packaging
+  solely for routine acceptance unless the user requests them.
+- Keep verification proportional to the change. Review the diff, check affected resource
+  references and localization consistency, and run `git diff --check`. For logic changes, add or
+  update focused tests as required below and run the relevant targeted tests. Purely visual or
+  documentation changes do not require new automated tests.
+- When changing Gradle configuration, dependencies, platform configuration, or packaging
+  scripts, run the smallest relevant compilation or build check needed to validate the change.
+  Avoid full builds or full test suites unless the scope or failures justify them. Apply the RAM
+  check above before memory-intensive verification.
+- Do not ask for confirmation each time routine acceptance is left to the user under this
+  policy. If the user explicitly requests builds, tests, or acceptance checks, carry them out
+  within the requested scope.
+- In the handoff, state what was checked, what remains unverified, and the specific commands
+  and acceptance steps the user still needs to run. Identify any pending screenshots for visible
+  UI changes. Claim build success or verified behavior only when supported by completed checks.
+
 ## Style and Testing
 
 Use four spaces and follow Kotlin conventions. Keep packages under `com.luofelix.laninbox`. Use

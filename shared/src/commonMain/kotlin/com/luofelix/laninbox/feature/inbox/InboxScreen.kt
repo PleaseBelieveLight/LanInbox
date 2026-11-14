@@ -55,6 +55,10 @@ import kotlinx.coroutines.launch
 import laninbox.shared.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
+/**
+ * @param scrollHeaderWithContent Scrolls the title and history menu with non-empty content.
+ * Reception feedback stays outside the list so transfer actions remain accessible.
+ */
 @Composable
 @Suppress("DEPRECATION")
 internal fun InboxScreen(
@@ -72,6 +76,7 @@ internal fun InboxScreen(
     openAttachment: (suspend (AttachmentInfo) -> Boolean)? = null,
     localAttachmentPreview: (@Composable (AttachmentInfo, () -> Unit) -> Unit)? = null,
     attachmentReceivedDates: Map<String, String> = emptyMap(),
+    scrollHeaderWithContent: Boolean = false,
 ) {
     val clipboard = LocalClipboardManager.current
     val snackbar = remember { SnackbarHostState() }
@@ -127,26 +132,25 @@ internal fun InboxScreen(
         )
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                stringResource(Res.string.tab_inbox),
-                Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        if (!scrollHeaderWithContent || !hasHistory) {
+            InboxHeader(
+                showClearHistory = clearHistory != null && hasHistory,
+                onClearHistory = { confirmingClear = true },
             )
-            if (clearHistory != null && hasHistory) {
-                InboxMenu(stringResource(Res.string.history_clear), action = { confirmingClear = true })
-            }
         }
         status()
         if (!hasHistory) {
             InboxEmptyState(Modifier.weight(1f).fillMaxWidth())
         } else LazyColumn(Modifier.weight(1f)) {
+            if (scrollHeaderWithContent) {
+                item(key = "inbox:header") {
+                    InboxHeader(
+                        showClearHistory = clearHistory != null,
+                        onClearHistory = { confirmingClear = true },
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                }
+            }
             items(messages, key = { "message:${it.request.senderId}:${it.request.messageId}" }) { item ->
                 val message = item.request
                 InboxRow(
@@ -175,6 +179,30 @@ internal fun InboxScreen(
             }
         }
         SnackbarHost(snackbar)
+    }
+}
+
+@Composable
+private fun InboxHeader(
+    showClearHistory: Boolean,
+    onClearHistory: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth().heightIn(min = 40.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            stringResource(Res.string.tab_inbox),
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (showClearHistory) {
+            InboxMenu(stringResource(Res.string.history_clear), action = onClearHistory)
+        }
     }
 }
 
