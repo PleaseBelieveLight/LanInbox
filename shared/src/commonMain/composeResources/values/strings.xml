@@ -3,6 +3,8 @@
     <string name="tab_send">Send</string>
     <string name="tab_inbox">Inbox</string>
     <string name="send_draft">Enter text or paste a link</string>
+    <string name="composer_expand">Expand composer and attachment options</string>
+    <string name="composer_collapse">Collapse composer</string>
     <string name="inbox_empty">Received text and files will appear here.</string>
     <string name="development_warning">Development only. Traffic is unencrypted. Use a trusted LAN.</string>
     <string name="receiver_address">Windows LAN IPv4 address (optional port)</string>
@@ -19,7 +21,7 @@
     <string name="pairing_revoke">Forget phone</string>
     <string name="attachment_bytes">%1$d bytes</string>
     <string name="attachment_save">Save as</string>
-    <string name="attachment_received_on">Received %1$s</string>
+    <string name="attachment_metadata">%1$s · %2$s</string>
     <string name="attachment_preparing">Preparing the file…</string>
     <string name="attachment_receiving">Receiving…</string>
     <string name="attachment_failed">Transfer failed. You can retry.</string>

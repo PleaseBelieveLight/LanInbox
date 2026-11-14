@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,18 +48,23 @@ internal fun AttachmentCard(
     open: (suspend (AttachmentInfo) -> Boolean)? = null,
     localPreview: (@Composable (AttachmentInfo, () -> Unit) -> Unit)? = null,
     receivedDate: String? = null,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
 ) {
     var showingPreview by remember { mutableStateOf(false) }
     val canPreview = attachment.canPreviewImage() && preview != null
     val size = fileSizeLabel(attachment.size)
     InboxRow(
         title = attachment.name,
-        subtitle = if (canPreview) stringResource(Res.string.preview_image, size) else size,
+        subtitle = when {
+            receivedDate != null -> stringResource(Res.string.attachment_metadata, size, receivedDate)
+            canPreview -> stringResource(Res.string.preview_image, size)
+            else -> size
+        },
         onOpen = { showingPreview = true },
         onSave = export?.let { save -> { save(attachment) } },
         onDelete = delete?.let { { it(attachment) } },
         leading = leading ?: { AttachmentTypeIcon(attachment) },
-        receivedDate = receivedDate?.let { stringResource(Res.string.attachment_received_on, it) },
+        contentPadding = contentPadding,
     )
     if (showingPreview) {
         val scope = rememberCoroutineScope()

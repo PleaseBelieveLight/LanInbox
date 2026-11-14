@@ -33,6 +33,7 @@ kotlin {
         androidMain.get().kotlin.srcDir("src/jvmAndAndroidMain/kotlin")
         jvmMain.get().kotlin.srcDir("src/jvmAndAndroidMain/kotlin")
         androidMain.dependencies {
+            implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.cio)
             implementation(libs.okhttp)
             implementation(libs.compose.uiToolingPreview)

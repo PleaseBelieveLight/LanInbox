@@ -96,10 +96,10 @@ fun AndroidHomeScreen(
                 openAttachment = openAttachment,
                 localAttachmentPreview = localAttachmentPreview,
                 attachmentReceivedDates = attachmentReceivedDates,
-                scrollHeaderWithContent = true,
+                collapsibleHeader = true,
                 status = inboxStatus,
                 modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)
-                    .padding(start = 16.dp, end = 16.dp, top = 12.dp),
+                    .padding(top = 12.dp),
                 messageIcon = { kind ->
                     InboxTypeIcon(
                         when (kind) {

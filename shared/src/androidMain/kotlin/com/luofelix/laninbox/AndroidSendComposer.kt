@@ -1,26 +1,37 @@
 package com.luofelix.laninbox
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -73,43 +84,102 @@ fun AndroidSendComposer(
             else -> Res.string.tab_send
         },
     )
-
-    Column {
-        // Let the field shrink before the action row when the keyboard reduces the available height.
-        Box(Modifier.weight(1f, fill = false)) {
-            if (file == null) {
-                TextField(
-                    value = state.draft,
-                    onValueChange = model::editDraft,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = enabled,
-                    placeholder = { Text(stringResource(Res.string.send_draft)) },
-                    maxLines = 4,
-                    isError = tooLong,
-                    supportingText = if (tooLong) {
-                        { Text(stringResource(Res.string.draft_too_long)) }
-                    } else null,
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        errorContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent,
-                        errorIndicatorColor = Color.Transparent,
-                    ),
-                )
-            } else {
-                AndroidAttachmentDraft(file, enabled, onRemove)
-            }
+    var expanded by rememberSaveable { mutableStateOf(state.draft.isNotBlank() || file != null) }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    fun collapse() {
+        focusManager.clearFocus()
+        keyboard?.hide()
+        expanded = false
+    }
+    BackHandler(enabled = expanded) { collapse() }
+    LaunchedEffect(file) {
+        if (file != null) {
+            expanded = true
+            focusManager.clearFocus()
+            keyboard?.hide()
         }
+    }
+    LaunchedEffect(state.result) {
+        if (state.result == DeliveryResult.Delivered) collapse()
+    }
+    LaunchedEffect(outgoingStatus) {
+        if (outgoingStatus == TransferStatus.Delivered) collapse()
+    }
+
+    Column(Modifier.animateContentSize(animationSpec = tween(180))) {
+        // Let the field shrink before the action row when the keyboard reduces the available height.
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 12.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.weight(1f, fill = false).fillMaxWidth()
+                .padding(start = 4.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row {
+            AttachmentAction(
+                icon = if (expanded) AppIcons.ChevronDown else AppIcons.ChevronUp,
+                label = stringResource(if (expanded) Res.string.composer_collapse else Res.string.composer_expand),
+                enabled = true,
+            ) {
+                if (expanded) collapse() else expanded = true
+            }
+            Box(Modifier.weight(1f)) {
+                if (file == null) {
+                    // Keep one field across both layouts to preserve focus, selection, and the draft.
+                    TextField(
+                        value = state.draft,
+                        onValueChange = model::editDraft,
+                        modifier = Modifier.fillMaxWidth().onFocusChanged {
+                            if (it.isFocused) expanded = true
+                        },
+                        enabled = enabled,
+                        placeholder = { Text(stringResource(Res.string.send_draft)) },
+                        singleLine = !expanded,
+                        maxLines = if (expanded) 4 else 1,
+                        isError = tooLong,
+                        supportingText = if (tooLong) {
+                            { Text(stringResource(Res.string.draft_too_long)) }
+                        } else null,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            errorContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                            errorIndicatorColor = Color.Transparent,
+                        ),
+                    )
+                } else {
+                    AndroidAttachmentDraft(file, enabled, onRemove)
+                }
+            }
+            IconButton(
+                modifier = Modifier.size(48.dp),
+                enabled = enabled && (file != null || (state.draft.isNotBlank() && !tooLong)),
+                colors = IconButtonDefaults.iconButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                ),
+                onClick = {
+                    when {
+                        connectRequired -> onConnect()
+                        file != null -> onSendFile()
+                        else -> model.send(senderId, sender, pairedAddress ?: developmentAddress.orEmpty(), peerIdentity)
+                    }
+                },
+            ) {
+                Icon(
+                    imageVector = if (retry && !connectRequired) AppIcons.Retry else AppIcons.Send,
+                    contentDescription = sendLabel,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
+        if (expanded) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 52.dp, end = 60.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 AttachmentAction(AppIcons.Image, stringResource(Res.string.attachment_pick_image), enabled) {
                     model.clearFeedback()
                     onPickImage()
@@ -122,22 +192,6 @@ fun AndroidSendComposer(
                     model.clearFeedback()
                     onPickFile()
                 }
-            }
-            FilledIconButton(
-                modifier = Modifier.size(48.dp),
-                enabled = enabled && (file != null || (state.draft.isNotBlank() && !tooLong)),
-                onClick = {
-                    when {
-                        connectRequired -> onConnect()
-                        file != null -> onSendFile()
-                        else -> model.send(senderId, sender, pairedAddress ?: developmentAddress.orEmpty(), peerIdentity)
-                    }
-                },
-            ) {
-                Icon(
-                    imageVector = if (retry && !connectRequired) AppIcons.Retry else AppIcons.Send,
-                    contentDescription = sendLabel,
-                )
             }
         }
         val result = state.result
@@ -167,12 +221,12 @@ fun AndroidSendComposer(
 @Composable
 private fun AndroidAttachmentDraft(file: SelectedFile, enabled: Boolean, onRemove: () -> Unit) {
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 4.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Row(
-            modifier = Modifier.padding(start = 12.dp, end = 4.dp),
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

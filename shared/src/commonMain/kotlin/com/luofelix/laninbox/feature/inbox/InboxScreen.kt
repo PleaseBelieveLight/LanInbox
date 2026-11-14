@@ -5,19 +5,25 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,8 +33,12 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -36,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -56,9 +67,11 @@ import laninbox.shared.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * @param scrollHeaderWithContent Scrolls the title and history menu with non-empty content.
- * Reception feedback stays outside the list so transfer actions remain accessible.
+ * Keeps reception feedback outside the list so transfer actions remain accessible.
+ * @param collapsibleHeader Uses a compact Android header that collapses with upward list scrolls
+ * and returns on downward scrolls. The default keeps the desktop header fixed.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("DEPRECATION")
 internal fun InboxScreen(
@@ -76,7 +89,7 @@ internal fun InboxScreen(
     openAttachment: (suspend (AttachmentInfo) -> Boolean)? = null,
     localAttachmentPreview: (@Composable (AttachmentInfo, () -> Unit) -> Unit)? = null,
     attachmentReceivedDates: Map<String, String> = emptyMap(),
-    scrollHeaderWithContent: Boolean = false,
+    collapsibleHeader: Boolean = false,
 ) {
     val clipboard = LocalClipboardManager.current
     val snackbar = remember { SnackbarHostState() }
@@ -86,6 +99,12 @@ internal fun InboxScreen(
     var openMessage by remember { mutableStateOf<InboxMessage?>(null) }
     val hasHistory = messages.isNotEmpty() || attachments.isNotEmpty()
     val desktopDialogs = LocalDesktopDialogs.current
+    val listState = key(hasHistory) { rememberLazyListState() }
+    val contentPadding = PaddingValues(horizontal = if (collapsibleHeader) 16.dp else 0.dp)
+    // Dispose the scroll behavior with the history so a newly received item starts with a full header.
+    val headerScrollBehavior = if (collapsibleHeader && hasHistory) {
+        TopAppBarDefaults.enterAlwaysScrollBehavior()
+    } else null
     if (confirmingClear && clearHistory != null) {
         AppDialog(
             onDismissRequest = { confirmingClear = false },
@@ -132,77 +151,123 @@ internal fun InboxScreen(
         )
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        if (!scrollHeaderWithContent || !hasHistory) {
+        if (headerScrollBehavior == null) {
             InboxHeader(
                 showClearHistory = clearHistory != null && hasHistory,
                 onClearHistory = { confirmingClear = true },
+                directClearAction = collapsibleHeader,
+                modifier = Modifier.padding(contentPadding),
             )
         }
-        status()
+        if (collapsibleHeader) {
+            Column(Modifier.fillMaxWidth().padding(contentPadding)) { status() }
+        } else status()
         if (!hasHistory) {
-            InboxEmptyState(Modifier.weight(1f).fillMaxWidth())
-        } else LazyColumn(Modifier.weight(1f)) {
-            if (scrollHeaderWithContent) {
-                item(key = "inbox:header") {
-                    InboxHeader(
-                        showClearHistory = clearHistory != null,
-                        onClearHistory = { confirmingClear = true },
-                        modifier = Modifier.padding(bottom = 4.dp),
+            InboxEmptyState(Modifier.weight(1f).fillMaxWidth().padding(contentPadding))
+        } else Column(
+            modifier = Modifier.weight(1f).fillMaxWidth().then(
+                headerScrollBehavior?.let { Modifier.nestedScroll(it.nestedScrollConnection) } ?: Modifier,
+            ),
+        ) {
+            if (headerScrollBehavior != null) {
+                InboxHeader(
+                    showClearHistory = clearHistory != null,
+                    onClearHistory = { confirmingClear = true },
+                    directClearAction = true,
+                    scrollBehavior = headerScrollBehavior,
+                )
+            }
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                state = listState,
+            ) {
+                items(messages, key = { "message:${it.request.senderId}:${it.request.messageId}" }) { item ->
+                    val message = item.request
+                    InboxRow(
+                        title = message.content,
+                        subtitle = kindLabel(message.kind),
+                        code = message.kind == MessageKind.Code,
+                        onOpen = { openMessage = item },
+                        action = {
+                            TextButton(onClick = {
+                                clipboard.setText(AnnotatedString(message.content))
+                                scope.launch { snackbar.showSnackbar(copiedLabel) }
+                            }) { Text(stringResource(Res.string.copy_message)) }
+                        },
+                        onDelete = deleteMessage?.let { { it(item) } },
+                        leading = if (messageIcon != null) ({ messageIcon(message.kind) }) else null,
+                        contentPadding = contentPadding,
                     )
                 }
-            }
-            items(messages, key = { "message:${it.request.senderId}:${it.request.messageId}" }) { item ->
-                val message = item.request
-                InboxRow(
-                    title = message.content,
-                    subtitle = kindLabel(message.kind),
-                    code = message.kind == MessageKind.Code,
-                    onOpen = { openMessage = item },
-                    action = {
-                        TextButton(onClick = {
-                            clipboard.setText(AnnotatedString(message.content))
-                            scope.launch { snackbar.showSnackbar(copiedLabel) }
-                        }) { Text(stringResource(Res.string.copy_message)) }
-                    },
-                    onDelete = deleteMessage?.let { { it(item) } },
-                    leading = if (messageIcon != null) ({ messageIcon(message.kind) }) else null,
-                )
-            }
-            items(attachments, key = { "attachment:${it.id}" }) { attachment ->
-                AttachmentCard(
-                    attachment, previewAttachment, exportAttachment, deleteAttachment,
-                    leading = if (attachmentIcon != null) ({ attachmentIcon(attachment) }) else null,
-                    open = openAttachment,
-                    localPreview = localAttachmentPreview,
-                    receivedDate = attachmentReceivedDates[attachment.id],
-                )
+                items(attachments, key = { "attachment:${it.id}" }) { attachment ->
+                    AttachmentCard(
+                        attachment, previewAttachment, exportAttachment, deleteAttachment,
+                        leading = if (attachmentIcon != null) ({ attachmentIcon(attachment) }) else null,
+                        open = openAttachment,
+                        localPreview = localAttachmentPreview,
+                        receivedDate = attachmentReceivedDates[attachment.id],
+                        contentPadding = contentPadding,
+                    )
+                }
             }
         }
         SnackbarHost(snackbar)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InboxHeader(
     showClearHistory: Boolean,
     onClearHistory: () -> Unit,
     modifier: Modifier = Modifier,
+    directClearAction: Boolean = false,
+    scrollBehavior: TopAppBarScrollBehavior? = null,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth().heightIn(min = 40.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    val title: @Composable () -> Unit = {
         Text(
             stringResource(Res.string.tab_inbox),
-            Modifier.weight(1f),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+    val actions: @Composable () -> Unit = {
         if (showClearHistory) {
-            InboxMenu(stringResource(Res.string.history_clear), action = onClearHistory)
+            if (directClearAction) {
+                TextButton(onClick = onClearHistory) {
+                    Icon(AppIcons.Delete, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(Res.string.history_clear))
+                }
+            } else {
+                InboxMenu(stringResource(Res.string.history_clear), action = onClearHistory)
+            }
         }
+    }
+    if (scrollBehavior != null) {
+        TopAppBar(
+            title = title,
+            actions = { actions() },
+            modifier = modifier,
+            expandedHeight = 48.dp,
+            // The owning Android scaffold already handles the status bar and horizontal safe insets.
+            windowInsets = WindowInsets(0, 0, 0, 0),
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.background,
+                scrolledContainerColor = MaterialTheme.colorScheme.background,
+            ),
+            scrollBehavior = scrollBehavior,
+        )
+        return
+    }
+    Row(
+        modifier = modifier.fillMaxWidth().heightIn(min = 40.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.weight(1f)) { title() }
+        actions()
     }
 }
 
@@ -257,16 +322,19 @@ internal fun InboxRow(
     onDelete: (() -> Unit)?,
     leading: (@Composable () -> Unit)? = null,
     onSave: (() -> Unit)? = null,
-    receivedDate: String? = null,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
 ) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        Modifier.fillMaxWidth()
+            .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
+            // Keep visual insets inside the clickable area so the ripple reaches the list edges.
+            .padding(contentPadding)
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         leading?.invoke()
         Column(
             Modifier.weight(1f)
-                .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
                 .padding(horizontal = 8.dp, vertical = 8.dp),
         ) {
             Text(
@@ -280,22 +348,16 @@ internal fun InboxRow(
                 subtitle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            receivedDate?.let {
-                Text(
-                    it,
-                    modifier = Modifier.padding(top = 2.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
         }
         action()
         if (onSave != null || onDelete != null) {
             InboxMenu(stringResource(Res.string.history_delete), action = onDelete, onSave = onSave)
         }
     }
-    HorizontalDivider()
+    HorizontalDivider(Modifier.padding(contentPadding))
 }
 
 @Composable
